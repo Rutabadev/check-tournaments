@@ -1,7 +1,6 @@
 FROM public.ecr.aws/lambda/nodejs:18
 
-COPY package*.json index.mjs screenshots ./
+COPY package*.json index.mjs ./
 RUN npm i --production
-ENV SCREENSHOT=true
 
 CMD [ "index.handler" ]
