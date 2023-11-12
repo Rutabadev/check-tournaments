@@ -1,13 +1,17 @@
 import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
-import { DynamoDBClient, PutItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb"
+import {
+  DynamoDBClient,
+  PutItemCommand,
+  QueryCommand,
+} from "@aws-sdk/client-dynamodb";
 
 const mailingList = process.env.MAILING_LIST.split(",");
 
 /**
- * @param {number} ms 
- * @returns 
+ * @param {number} ms
+ * @returns
  */
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -38,11 +42,15 @@ export const handler = async () => {
     await page.keyboard.type(process.env.PASSWORD);
     // Get a button with text "Connecter" and click it
     await page.$$eval("button", (buttons) => {
-      buttons.filter((button) => button.innerText.toLowerCase().includes("connecter"))[0].click();
+      buttons
+        .filter((button) =>
+          button.innerText.toLowerCase().includes("connecter")
+        )[0]
+        .click();
     });
 
     // Accueil
-   await Promise.all([
+    await Promise.all([
       page.waitForNavigation(),
       page.waitForSelector('a[href^="/membre/events/event.html"]'),
     ]);
@@ -52,60 +60,77 @@ export const handler = async () => {
     console.log("Go to tournoi page");
 
     // Tournoi
-    await page.waitForSelector(".card-body"),
-    await wait(200);
+    await page.waitForSelector(".card-body"), await wait(200);
 
     const tournoisDivs = await page.$$(".card-body");
-    console.log('found tournois', tournoisDivs.length);
+    console.log("found tournois", tournoisDivs.length);
 
-    const tournois = await Promise.all(tournoisDivs.map(async (tournoiDiv) => {
-      const tournoiInfo = await tournoiDiv.evaluate((node) => node.innerText);
-      return tournoiInfo.replace(/\n/g, " ");
-    }));
+    const tournois = await Promise.all(
+      tournoisDivs.map(async (tournoiDiv) => {
+        const tournoiInfo = await tournoiDiv.evaluate((node) => node.innerText);
+        return tournoiInfo.replace(/\n/g, " ");
+      })
+    );
 
-    console.log('tournois', tournois);
+    console.log("tournois", tournois);
 
     const serializedTournois = JSON.stringify(tournois);
 
     const dynamoDbClient = new DynamoDBClient({});
 
-    const { Items } = await dynamoDbClient.send(new QueryCommand({
-      TableName: "tournaments",
-      KeyConditionExpression: "id = :id",
-      ExpressionAttributeValues: {
-        ":id": { S: "latest" },
-      },
-    }));
+    const { Items } = await dynamoDbClient.send(
+      new QueryCommand({
+        TableName: "tournaments",
+        KeyConditionExpression: "id = :id",
+        ExpressionAttributeValues: {
+          ":id": { S: "latest" },
+        },
+      })
+    );
 
-    const latestTournaments = Items?.[0]?.tournaments?.S || "[]";
+    const serializedLatestTournaments = Items?.[0]?.tournaments?.S || "[]";
 
-    if (latestTournaments === serializedTournois) {
-      console.log('No new tournaments');
+    if (serializedLatestTournaments === serializedTournois) {
+      console.log("No new tournaments from last time");
       return {
         statusCode: 200,
         body: JSON.stringify("No new tournaments"),
       };
-    } else {
-      const latestTournamentsArray = JSON.parse(latestTournaments);
-      console.log('latestTournamentsArray', latestTournamentsArray);
+    }
 
-      const newTournaments = tournois
-        .filter((tournoi) => !latestTournamentsArray.includes(tournoi))
-        .filter((tournoi) => !tournoi.toLowerCase().includes("complet"))
-        .filter((tournoi) => ['p100', 'p250'].some((level) => tournoi.toLowerCase().includes(level)));
-
-      console.log('newTournaments', newTournaments);
-
-      await dynamoDbClient.send(new PutItemCommand({
+    await dynamoDbClient.send(
+      new PutItemCommand({
         TableName: "tournaments",
         Item: {
           id: { S: "latest" },
           tournaments: { S: serializedTournois },
         },
-      }));
+      })
+    );
 
-      const ses = new SESClient({});
-      await ses.send(new SendEmailCommand({
+    const latestTournaments = JSON.parse(serializedLatestTournaments);
+    console.log("latestTournamentsArray", latestTournaments);
+
+    const newTournaments = tournois
+      .filter((tournoi) => !latestTournaments.includes(tournoi))
+      .filter((tournoi) => !tournoi.toLowerCase().includes("complet"))
+      .filter((tournoi) =>
+        ["p100", "p250"].some((level) => tournoi.toLowerCase().includes(level))
+      );
+
+    console.log("newTournaments", newTournaments);
+
+    if (newTournaments.length === 0) {
+      console.log("No new tournaments after filtering");
+      return {
+        statusCode: 200,
+        body: JSON.stringify("No new tournaments"),
+      };
+    }
+
+    const ses = new SESClient({});
+    await ses.send(
+      new SendEmailCommand({
         Destination: {
           ToAddresses: mailingList,
         },
@@ -121,12 +146,12 @@ export const handler = async () => {
           },
           Subject: {
             Charset: "UTF-8",
-            Data: 'New tournaments',
+            Data: "New tournaments",
           },
         },
         Source: "izi.rutabaga@gmail.com",
-      }));
-    }
+      })
+    );
   } catch (error) {
     throw error;
   }
