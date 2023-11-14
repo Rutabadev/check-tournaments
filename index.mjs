@@ -67,14 +67,20 @@ export const handler = async () => {
 
     const tournois = await Promise.all(
       tournoisDivs.map(async (tournoiDiv) => {
-        const tournoiInfo = await tournoiDiv.evaluate((node) => node.innerText);
-        return tournoiInfo.replace(/\n/g, " ");
+        const [tournoiInfo, tournoiId] = (await Promise.all([
+          await tournoiDiv.evaluate(node => node.innerText),
+          await tournoiDiv.$eval(".row", node => node.innerText),
+        ])).map(text => text.replace(/\n/g, " "));
+        return {
+            data: tournoiInfo,
+            id: tournoiId,
+          }
       })
     );
 
     console.log("tournois", tournois);
 
-    const serializedTournois = JSON.stringify(tournois);
+    const serializedTournoisId = JSON.stringify(tournois.map(tournoi => tournoi.id));
 
     const dynamoDbClient = new DynamoDBClient({});
 
@@ -88,9 +94,9 @@ export const handler = async () => {
       })
     );
 
-    const serializedLatestTournaments = Items?.[0]?.tournaments?.S || "[]";
+    const serializedLatestTournamentsId = Items?.[0]?.tournaments?.S || "[]";
 
-    if (serializedLatestTournaments === serializedTournois) {
+    if (serializedLatestTournamentsId === serializedTournoisId) {
       console.log("No new tournaments from last time");
       return {
         statusCode: 200,
@@ -103,19 +109,19 @@ export const handler = async () => {
         TableName: "tournaments",
         Item: {
           id: { S: "latest" },
-          tournaments: { S: serializedTournois },
+          tournaments: { S: serializedTournoisId },
         },
       })
     );
 
-    const latestTournaments = JSON.parse(serializedLatestTournaments);
+    const latestTournaments = JSON.parse(serializedLatestTournamentsId);
     console.log("latestTournamentsArray", latestTournaments);
 
     const newTournaments = tournois
       .filter((tournoi) => !latestTournaments.includes(tournoi))
-      .filter((tournoi) => !tournoi.toLowerCase().includes("complet"))
+      .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
       .filter((tournoi) =>
-        ["p100", "p250"].some((level) => tournoi.toLowerCase().includes(level))
+        ["p100", "p250"].some((level) => tournoi.data.toLowerCase().includes(level))
       );
 
     console.log("newTournaments", newTournaments);
