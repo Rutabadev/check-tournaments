@@ -118,7 +118,7 @@ export const handler = async () => {
     console.log("latestTournamentsArray", latestTournaments);
 
     const newTournaments = tournois
-      .filter((tournoi) => !latestTournaments.includes(tournoi))
+      .filter((tournoi) => !latestTournaments.includes(tournoi.id))
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
       .filter((tournoi) =>
         ["p100", "p250"].some((level) => tournoi.data.toLowerCase().includes(level))
@@ -146,7 +146,7 @@ export const handler = async () => {
               Charset: "UTF-8",
               Data: `
               <h1>New tournaments</h1>
-              <p>${newTournaments.join("<br />")}</p>
+              <p>${newTournaments.map(newTournoi => newTournoi.data).join("<br />")}</p>
               `,
             },
           },
