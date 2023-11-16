@@ -67,20 +67,24 @@ export const handler = async () => {
 
     const tournois = await Promise.all(
       tournoisDivs.map(async (tournoiDiv) => {
-        const [tournoiInfo, tournoiId] = (await Promise.all([
-          await tournoiDiv.evaluate(node => node.innerText),
-          await tournoiDiv.$eval(".row", node => node.innerText),
-        ])).map(text => text.replace(/\n/g, " "));
+        const [tournoiInfo, tournoiId] = (
+          await Promise.all([
+            await tournoiDiv.evaluate((node) => node.innerText),
+            await tournoiDiv.$eval(".row", (node) => node.innerText),
+          ])
+        ).map((text) => text.replace(/\n/g, " "));
         return {
-            data: tournoiInfo,
-            id: tournoiId,
-          }
+          data: tournoiInfo,
+          id: tournoiId,
+        };
       })
     );
 
     console.log("tournois", tournois);
 
-    const serializedTournoisId = JSON.stringify(tournois.map(tournoi => tournoi.id));
+    const serializedTournoisId = JSON.stringify(
+      tournois.map((tournoi) => tournoi.id)
+    );
 
     const dynamoDbClient = new DynamoDBClient({});
 
@@ -121,7 +125,9 @@ export const handler = async () => {
       .filter((tournoi) => !latestTournaments.includes(tournoi.id))
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
       .filter((tournoi) =>
-        ["p100", "p250"].some((level) => tournoi.data.toLowerCase().includes(level))
+        ["p100", "p250"].some((level) =>
+          tournoi.data.toLowerCase().includes(level)
+        )
       );
 
     console.log("newTournaments", newTournaments);
@@ -146,7 +152,9 @@ export const handler = async () => {
               Charset: "UTF-8",
               Data: `
               <h1>New tournaments</h1>
-              <p>${newTournaments.map(newTournoi => newTournoi.data).join("<br />")}</p>
+              <p>${newTournaments
+                .map((newTournoi) => newTournoi.data)
+                .join("<br />")}</p>
               `,
             },
           },
