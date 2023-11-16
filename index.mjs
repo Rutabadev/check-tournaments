@@ -40,7 +40,6 @@ export const handler = async () => {
     await wait(2000);
     await page.keyboard.press("Tab");
     await page.keyboard.type(process.env.PASSWORD);
-    // Get a button with text "Connecter" and click it
     await page.$$eval("button", (buttons) => {
       buttons
         .filter((button) =>
@@ -69,8 +68,8 @@ export const handler = async () => {
       tournoisDivs.map(async (tournoiDiv) => {
         const [tournoiInfo, tournoiId] = (
           await Promise.all([
-            await tournoiDiv.evaluate((node) => node.innerText),
-            await tournoiDiv.$eval(".row", (node) => node.innerText),
+            tournoiDiv.evaluate((node) => node.innerText),
+            tournoiDiv.$eval(".row", (node) => node.innerText),
           ])
         ).map((text) => text.replace(/\n/g, " "));
         return {
