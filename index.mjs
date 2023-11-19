@@ -78,7 +78,6 @@ export const handler = async () => {
         };
       })
     );
-
     console.log("tournois", tournois);
 
     const serializedTournoisId = JSON.stringify(
@@ -128,7 +127,6 @@ export const handler = async () => {
           tournoi.data.toLowerCase().includes(level)
         )
       );
-
     console.log("newTournaments", newTournaments);
 
     if (newTournaments.length === 0) {
