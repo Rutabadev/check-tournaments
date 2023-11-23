@@ -1,6 +1,6 @@
 import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import nodemailer from "nodemailer";
 import {
   DynamoDBClient,
   PutItemCommand,
@@ -137,32 +137,26 @@ export const handler = async () => {
       };
     }
 
-    const ses = new SESClient({});
-    await ses.send(
-      new SendEmailCommand({
-        Destination: {
-          ToAddresses: mailingList,
-        },
-        Message: {
-          Body: {
-            Html: {
-              Charset: "UTF-8",
-              Data: `
-              <h1>New tournaments</h1>
-              <p>${newTournaments
-                .map((newTournoi) => newTournoi.data)
-                .join("<br />")}</p>
-              `,
-            },
-          },
-          Subject: {
-            Charset: "UTF-8",
-            Data: "New tournaments",
-          },
-        },
-        Source: "izi.rutabaga@gmail.com",
-      })
-    );
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "izi.rutabaga@gmail.com",
+        pass: process.env.EMAIL_APP_PASS, // app-specific password since 2FA is enabled
+      },
+    });
+    const mailOptions = {
+      from: "izi.rutabaga@gmail.com",
+      to: mailingList.join(", "),
+      subject: "New tournaments",
+      html: `
+        <h1>New tournaments</h1>
+        <p>${newTournaments
+          .map((newTournoi) => newTournoi.data)
+          .join("<br />")}</p>
+        `,
+    };
+    const sentMessageInfo = await transporter.sendMail(mailOptions);
+    console.log("Email sent:", sentMessageInfo);
   } catch (error) {
     throw error;
   }
