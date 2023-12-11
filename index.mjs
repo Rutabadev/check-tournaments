@@ -7,7 +7,13 @@ import {
   QueryCommand,
 } from "@aws-sdk/client-dynamodb";
 
-const mailingList = process.env.MAILING_LIST.split(",");
+const { MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS } = process.env;
+
+if (!MAILING_LIST || !EMAIL || !EMAIL_APP_PASS || !PASSWORD) {
+  throw new Error("Missing env variables, required: MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS");
+}
+
+const mailingList = MAILING_LIST.split(",");
 
 /**
  * @param {number} ms
@@ -34,12 +40,12 @@ export const handler = async () => {
     await page.goto("https://toulousepadelclub.gestion-sports.com");
     console.log("Go to login page");
 
-    await page.type("input[type=text][name=email]", process.env.EMAIL);
+    await page.type("input[type=text][name=email]", EMAIL);
     await page.keyboard.press("Tab");
     await page.keyboard.press("Enter");
     await wait(2000);
     await page.keyboard.press("Tab");
-    await page.keyboard.type(process.env.PASSWORD);
+    await page.keyboard.type(PASSWORD);
     await page.$$eval("button", (buttons) => {
       buttons
         .filter((button) =>
@@ -68,8 +74,8 @@ export const handler = async () => {
       tournoisDivs.map(async (tournoiDiv) => {
         const [tournoiInfo, tournoiId] = (
           await Promise.all([
-            tournoiDiv.evaluate((node) => node.innerText),
-            tournoiDiv.$eval(".row", (node) => node.innerText),
+            tournoiDiv.evaluate((node) => /** @type {HTMLElement} */ (node).innerText),
+            tournoiDiv.$eval(".row", (node) => /** @type {HTMLElement} */ (node).innerText),
           ])
         ).map((text) => text.replace(/\n/g, " "));
         return {
@@ -141,7 +147,7 @@ export const handler = async () => {
       service: "gmail",
       auth: {
         user: "izi.rutabaga@gmail.com",
-        pass: process.env.EMAIL_APP_PASS, // app-specific password since 2FA is enabled
+        pass: EMAIL_APP_PASS, // app-specific password since 2FA is enabled
       },
     });
     const mailOptions = {
