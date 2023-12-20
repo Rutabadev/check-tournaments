@@ -129,7 +129,8 @@ export const handler = async () => {
       .filter((tournoi) => !latestTournaments.includes(tournoi.id))
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
       .filter((tournoi) =>
-        ["p100", "p250"].some((level) =>
+        // p25 will match p250 as well
+        ["p25", "p100"].some((level) =>
           tournoi.data.toLowerCase().includes(level)
         )
       );
