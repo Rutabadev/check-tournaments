@@ -10,7 +10,9 @@ import {
 const { MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS } = process.env;
 
 if (!MAILING_LIST || !EMAIL || !EMAIL_APP_PASS || !PASSWORD) {
-  throw new Error("Missing env variables, required: MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS");
+  throw new Error(
+    "Missing env variables, required: MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS"
+  );
 }
 
 const mailingList = MAILING_LIST.split(",");
@@ -74,13 +76,20 @@ export const handler = async () => {
       tournoisDivs.map(async (tournoiDiv) => {
         const [tournoiInfo, tournoiId] = (
           await Promise.all([
-            tournoiDiv.evaluate((node) => /** @type {HTMLElement} */ (node).innerText),
-            tournoiDiv.$eval(".row", (node) => /** @type {HTMLElement} */ (node).innerText),
+            tournoiDiv.evaluate(
+              (node) => /** @type {HTMLElement} */ (node).innerText
+            ),
+            tournoiDiv.$eval(
+              ".row",
+              (node) => /** @type {HTMLElement} */ (node).innerText
+            ),
           ])
         ).map((text) => text.replace(/\n/g, " "));
         return {
           data: tournoiInfo,
-          id: tournoiId,
+          id: `${tournoiId}${
+            tournoiInfo.toLowerCase().includes("complet") ? "_complet" : ""
+          }`,
         };
       })
     );
@@ -108,7 +117,7 @@ export const handler = async () => {
       console.log("No new tournaments from last time");
       return {
         statusCode: 200,
-        body: JSON.stringify("No new tournaments"),
+        body: JSON.stringify("No new changes in tournaments"),
       };
     }
 
@@ -133,7 +142,14 @@ export const handler = async () => {
         ["p25", "p100"].some((level) =>
           tournoi.data.toLowerCase().includes(level)
         )
-      );
+      )
+      .map((tournoi) => {
+        // notify if tounoi was previously full but now has spots
+        if (latestTournaments.includes(`${tournoi.id}_complet`)) {
+          return { ...tournoi, data: `Places libérées : ${tournoi.data}` };
+        }
+        return tournoi;
+      });
     console.log("newTournaments", newTournaments);
 
     if (newTournaments.length === 0) {
@@ -157,9 +173,12 @@ export const handler = async () => {
       subject: "New tournaments",
       html: `
         <h1>New tournaments</h1>
-        <p>${newTournaments
-          .map((newTournoi) => newTournoi.data)
-          .join("<br />")}</p>
+        ${newTournaments
+          .map(
+            (newTournoi) =>
+              `<p style="font-size:1rem;line-height:1.5rem">${newTournoi.data}</p>`
+          )
+          .join("")}
         `,
     };
     const sentMessageInfo = await transporter.sendMail(mailOptions);
