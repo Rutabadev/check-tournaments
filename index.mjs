@@ -137,6 +137,7 @@ export const handler = async () => {
     const newTournaments = tournois
       .filter((tournoi) => !latestTournaments.includes(tournoi.id))
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
+      .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
       .filter((tournoi) =>
         // p25 will match p250 as well
         ["p25", "p100"].some((level) =>
