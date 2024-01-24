@@ -139,8 +139,7 @@ export const handler = async () => {
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
       .filter((tournoi) =>
-        // p25 will match p250 as well
-        ["p25", "p100"].some((level) =>
+        ["p25 ", "p100 ", "p250 "].some((level) =>
           tournoi.data.toLowerCase().includes(level)
         )
       )
