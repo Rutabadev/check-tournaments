@@ -74,8 +74,12 @@ export const handler = async () => {
 
     const tournois = await Promise.all(
       tournoisDivs.map(async (tournoiDiv) => {
-        const [tournoiInfo, tournoiId] = (
+        const [tournoiTitle, tournoiInfo, tournoiId] = (
           await Promise.all([
+            tournoiDiv.$eval(
+              ".card-title",
+              (node) => /** @type {HTMLElement} */ (node).innerText
+            ),
             tournoiDiv.evaluate(
               (node) => /** @type {HTMLElement} */ (node).innerText
             ),
@@ -87,7 +91,7 @@ export const handler = async () => {
         ).map((text) => text.replace(/\n/g, " "));
         return {
           data: tournoiInfo,
-          id: `${tournoiId}${
+          id: `${tournoiTitle}${tournoiId}${
             tournoiInfo.toLowerCase().includes("complet") ? "_complet" : ""
           }`,
         };
