@@ -148,7 +148,7 @@ export const handler = async () => {
         )
       )
       .map((tournoi) => {
-        // notify if tounoi was previously full but now has spots
+        // notify if tournoi was previously full but now has spots
         if (latestTournaments.includes(`${tournoi.id}_complet`)) {
           return { ...tournoi, data: `Places libérées : ${tournoi.data}` };
         }
