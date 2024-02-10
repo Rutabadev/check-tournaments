@@ -24,6 +24,65 @@ const mailingList = MAILING_LIST.split(",");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const handler = async () => {
+  const dynamoDbClient = new DynamoDBClient({});
+
+  const { Items } = await dynamoDbClient.send(
+    new QueryCommand({
+      TableName: "tournaments",
+      KeyConditionExpression: "id = :id",
+      ExpressionAttributeValues: {
+        ":id": { S: "cookie" },
+      },
+    })
+  );
+  const serializedCookies = Items?.[0]?.value?.S || "{}";
+
+  /**
+   * @type {{ PHPSESSID: string, COOK_COMPTE: string, expiry: string }}
+   */
+  let cookies = JSON.parse(serializedCookies);
+
+  if (new Date(cookies.expiry) < new Date()) {
+    const loginData = new URLSearchParams();
+    loginData.append("ajax", "connexionUser");
+    loginData.append("email", "etienner37@gmail.com");
+    loginData.append("pass", "7c3bK!k6ca4qbYy");
+    loginData.append("compte", "user");
+
+    const loginResponse = await fetch(
+      "https://toulousepadelclub.gestion-sports.com/traitement/connexion.php",
+      {
+        method: "POST",
+        body: loginData,
+      }
+    );
+
+    const responseCookies = loginResponse.headers.get("set-cookie");
+    const phpSessid = responseCookies?.match(/PHPSESSID=(.*?);/)?.[1];
+    const cookCompte = responseCookies?.match(/COOK_COMPTE=(.*?);/)?.[1];
+    const cookCompteExpiration = responseCookies?.match(
+      /COOK_COMPTE=.*?; expires=(.*?);/
+    )?.[1];
+
+    cookies = {
+      PHPSESSID: phpSessid ?? "",
+      COOK_COMPTE: cookCompte ?? "",
+      expiry: cookCompteExpiration ?? "",
+    };
+
+    await dynamoDbClient.send(
+      new PutItemCommand({
+        TableName: "tournaments",
+        Item: {
+          id: { S: "cookie" },
+          value: { S: JSON.stringify(cookies) },
+        },
+      })
+    );
+
+    console.log("Updated cookies", cookies);
+  }
+
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
@@ -37,33 +96,17 @@ export const handler = async () => {
   let page;
   try {
     page = await browser.newPage();
+    let { expiry, ...actualCookies } = cookies;
+    const cookiesToSet = Object.entries(actualCookies).map(([name, value]) => ({
+      name,
+      value,
+      domain: "toulousepadelclub.gestion-sports.com",
+    }));
+    await page.setCookie(...cookiesToSet);
 
-    // Login
-    await page.goto("https://toulousepadelclub.gestion-sports.com");
-    console.log("Go to login page");
-
-    await page.type("input[type=text][name=email]", EMAIL);
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Enter");
-    await wait(2000);
-    await page.keyboard.press("Tab");
-    await page.keyboard.type(PASSWORD);
-    await page.$$eval("button", (buttons) => {
-      buttons
-        .filter((button) =>
-          button.innerText.toLowerCase().includes("connecter")
-        )[0]
-        .click();
-    });
-
-    // Accueil
-    await Promise.all([
-      page.waitForNavigation(),
-      page.waitForSelector('a[href^="/membre/events/event.html"]'),
-    ]);
-    console.log("Login done");
-    await wait(2000);
-    await page.click('a[href^="/membre/events/event.html"]');
+    await page.goto(
+      "https://toulousepadelclub.gestion-sports.com/membre/events/event.html?event=1174"
+    );
     console.log("Go to tournoi page");
 
     // Tournoi
@@ -103,8 +146,6 @@ export const handler = async () => {
       tournois.map((tournoi) => tournoi.id)
     );
 
-    const dynamoDbClient = new DynamoDBClient({});
-
     const { Items } = await dynamoDbClient.send(
       new QueryCommand({
         TableName: "tournaments",
@@ -115,7 +156,7 @@ export const handler = async () => {
       })
     );
 
-    const serializedLatestTournamentsId = Items?.[0]?.tournaments?.S || "[]";
+    const serializedLatestTournamentsId = Items?.[0]?.value?.S || "[]";
 
     if (serializedLatestTournamentsId === serializedTournoisId) {
       console.log("No new tournaments from last time");
@@ -130,7 +171,7 @@ export const handler = async () => {
         TableName: "tournaments",
         Item: {
           id: { S: "latest" },
-          tournaments: { S: serializedTournoisId },
+          value: { S: serializedTournoisId },
         },
       })
     );
