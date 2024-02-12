@@ -1,6 +1,5 @@
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
-import nodemailer from "nodemailer";
+import { load } from "cheerio";
+import { createTransport } from "nodemailer";
 import {
   DynamoDBClient,
   PutItemCommand,
@@ -17,24 +16,10 @@ if (!MAILING_LIST || !EMAIL || !EMAIL_APP_PASS || !PASSWORD) {
 }
 
 const mailingList = MAILING_LIST.split(",");
-let browser;
 
 export const handler = async () => {
   const dynamoDbClient = new DynamoDBClient({});
-  const startBrowserPromise = puppeteer
-    .launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath,
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
-    })
-    .then((b) => {
-      browser = b;
-      return browser.newPage();
-    });
 
-  console.time("login");
   const loginData = new URLSearchParams();
   loginData.append("ajax", "connexionUser");
   loginData.append("email", "etienner37@gmail.com");
@@ -57,145 +42,111 @@ export const handler = async () => {
     PHPSESSID: phpSessid ?? "",
     COOK_COMPTE: cookCompte ?? "",
   };
-  console.timeEnd("login");
-
-  let screenshot;
-  /**
-   * @type {import("puppeteer-core").Page}
-   */
-  try {
-    console.time("fetch page");
-    const [page, tournoiPage] = await Promise.all([
-      startBrowserPromise,
-      fetch(
-        "https://toulousepadelclub.gestion-sports.com/membre/events/event.html?event=1174",
-        {
-          headers: {
-            cookie: `PHPSESSID=${cookies.PHPSESSID}; COOK_COMPTE=${cookies.COOK_COMPTE}`,
-          },
-        }
-      ).then((res) => res.text()),
-    ]);
-    await page.setContent(tournoiPage);
-    console.timeEnd("fetch page");
-    console.time("take screenshot");
-    page.screenshot().then((buffer) => (screenshot = buffer));
-    console.timeEnd("take screenshot");
-    console.log("Go to tournoi page");
-
-    // Tournoi
-    await page.waitForSelector(".card-body");
-    const tournoisDivs = await page.$$(".card-body");
-    console.log("found tournois", tournoisDivs.length);
-
-    console.time("check tournois");
-    const [tournois, serializedLatestTournamentsId] = await Promise.all([
-      Promise.all(
-        tournoisDivs.map(async (tournoiDiv) => {
-          const [tournoiTitle, tournoiInfo, tournoiId] = (
-            await Promise.all([
-              tournoiDiv.$eval(
-                ".card-title",
-                (node) => /** @type {HTMLElement} */ (node).innerText
-              ),
-              tournoiDiv.evaluate(
-                (node) => /** @type {HTMLElement} */ (node).innerText
-              ),
-              tournoiDiv.$eval(
-                ".row",
-                (node) => /** @type {HTMLElement} */ (node).innerText
-              ),
-            ])
-          ).map((text) => text.replace(/\n/g, " "));
-          return {
-            data: tournoiInfo,
-            id: `${tournoiTitle}${tournoiId}${
-              tournoiInfo.toLowerCase().includes("complet") ? "_complet" : ""
-            }`,
-          };
-        })
-      ),
-      dynamoDbClient
-        .send(
-          new QueryCommand({
-            TableName: "tournaments",
-            KeyConditionExpression: "id = :id",
-            ExpressionAttributeValues: {
-              ":id": { S: "latest" },
-            },
-          })
-        )
-        .then(({ Items }) => Items?.[0]?.value?.S || "[]"),
-    ]);
-    console.timeEnd("check tournois");
-    console.log("tournois", tournois);
-
-    const serializedTournoisId = JSON.stringify(
-      tournois.map((tournoi) => tournoi.id)
-    );
-
-    if (serializedLatestTournamentsId === serializedTournoisId) {
-      console.log("No new tournaments from last time");
-      return {
-        statusCode: 200,
-        body: JSON.stringify("No new changes in tournaments"),
-      };
+  const tournoiPage = await fetch(
+    "https://toulousepadelclub.gestion-sports.com/membre/events/event.html?event=1174",
+    {
+      headers: {
+        cookie: `PHPSESSID=${cookies.PHPSESSID}; COOK_COMPTE=${cookies.COOK_COMPTE}`,
+      },
     }
+  ).then((res) => res.text());
+  const $ = load(tournoiPage);
 
-    console.time("save latest tournaments");
-    await dynamoDbClient.send(
-      new PutItemCommand({
+  // Tournoi
+  const tournoisDivs = $(".card-body");
+  console.log("found tournois", tournoisDivs.length);
+
+  const tournois = tournoisDivs.get().map((tournoiDiv) => {
+    const [tournoiTitle, tournoiInfo, tournoiId] = [
+      $(tournoiDiv).find(".card-title").text().trim(),
+      $(tournoiDiv).text().trim(),
+      $(tournoiDiv).find(".row").text().trim(),
+    ]
+      .map((text) => text.replace(/\s+/g, " "))
+      .map((text) => text.replace(/\n/g, " "));
+    return {
+      data: tournoiInfo,
+      id: `${tournoiTitle}${tournoiId}${
+        tournoiInfo.toLowerCase().includes("complet") ? "_complet" : ""
+      }`,
+    };
+  });
+  const serializedLatestTournamentsId = await dynamoDbClient
+    .send(
+      new QueryCommand({
         TableName: "tournaments",
-        Item: {
-          id: { S: "latest" },
-          value: { S: serializedTournoisId },
+        KeyConditionExpression: "id = :id",
+        ExpressionAttributeValues: {
+          ":id": { S: "latest" },
         },
       })
-    );
-    console.timeEnd("save latest tournaments");
+    )
+    .then(({ Items }) => Items?.[0]?.value?.S || "[]");
+  console.log("tournois", tournois);
 
-    const latestTournaments = JSON.parse(serializedLatestTournamentsId);
-    console.log("latestTournamentsArray", latestTournaments);
+  const serializedTournoisId = JSON.stringify(
+    tournois.map((tournoi) => tournoi.id)
+  );
 
-    const newTournaments = tournois
-      .filter((tournoi) => !latestTournaments.includes(tournoi.id))
-      .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
-      .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
-      .filter((tournoi) =>
-        ["p25 ", "p100 ", "p250 "].some((level) =>
-          tournoi.data.toLowerCase().includes(level)
-        )
-      )
-      .map((tournoi) => {
-        // notify if tournoi was previously full but now has spots
-        if (latestTournaments.includes(`${tournoi.id}_complet`)) {
-          return { ...tournoi, data: `Places libérées : ${tournoi.data}` };
-        }
-        return tournoi;
-      });
-    console.log("newTournaments", newTournaments);
+  if (serializedLatestTournamentsId === serializedTournoisId) {
+    console.log("No new tournaments from last time");
+    return {
+      statusCode: 200,
+      body: JSON.stringify("No new changes in tournaments"),
+    };
+  }
 
-    if (newTournaments.length === 0) {
-      console.log("No new tournaments after filtering");
-      return {
-        statusCode: 200,
-        body: JSON.stringify("No new tournaments"),
-      };
-    }
-
-    console.time("send email");
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: "izi.rutabaga@gmail.com",
-        pass: EMAIL_APP_PASS, // app-specific password since 2FA is enabled
+  await dynamoDbClient.send(
+    new PutItemCommand({
+      TableName: "tournaments",
+      Item: {
+        id: { S: "latest" },
+        value: { S: serializedTournoisId },
       },
+    })
+  );
+
+  const latestTournaments = JSON.parse(serializedLatestTournamentsId);
+  console.log("latestTournamentsArray", latestTournaments);
+
+  const newTournaments = tournois
+    .filter((tournoi) => !latestTournaments.includes(tournoi.id))
+    .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
+    .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
+    .filter((tournoi) =>
+      ["p25 ", "p100 ", "p250 "].some((level) =>
+        tournoi.data.toLowerCase().includes(level)
+      )
+    )
+    .map((tournoi) => {
+      // notify if tournoi was previously full but now has spots
+      if (latestTournaments.includes(`${tournoi.id}_complet`)) {
+        return { ...tournoi, data: `Places libérées : ${tournoi.data}` };
+      }
+      return tournoi;
     });
-    const mailOptions = {
-      from: "izi.rutabaga@gmail.com",
-      to: mailingList.join(", "),
-      subject: "New tournaments",
-      html: `
+  console.log("newTournaments", newTournaments);
+
+  if (newTournaments.length === 0) {
+    console.log("No new tournaments after filtering");
+    return {
+      statusCode: 200,
+      body: JSON.stringify("No new tournaments"),
+    };
+  }
+
+  const transporter = createTransport({
+    service: "gmail",
+    auth: {
+      user: "izi.rutabaga@gmail.com",
+      pass: EMAIL_APP_PASS, // app-specific password since 2FA is enabled
+    },
+  });
+  const mailOptions = {
+    from: "izi.rutabaga@gmail.com",
+    to: mailingList.join(", "),
+    subject: "New tournaments",
+    html: `
         <h1>New tournaments</h1>
         ${newTournaments
           .map(
@@ -204,31 +155,9 @@ export const handler = async () => {
           )
           .join("")}
         `,
-    };
-    const sentMessageInfo = await transporter.sendMail(mailOptions);
-    console.timeEnd("send email");
-    console.log("Email sent:", sentMessageInfo);
-  } catch (error) {
-    if (screenshot) {
-      const s3 = new S3Client({});
-      const s3Params = {
-        Bucket: "rutabagafea",
-        Key: `padelito/screenshots/check-tournois-error-${new Date().toISOString()}.png`,
-        Body: screenshot,
-        ContentEncoding: "base64",
-        ContentType: "image/png",
-      };
-      try {
-        await s3.send(new PutObjectCommand(s3Params));
-        console.log("Screenshot saved to S3");
-      } catch (err) {
-        console.log("Error", err);
-      }
-    }
-
-    throw error;
-  }
-  await browser.close();
+  };
+  const sentMessageInfo = await transporter.sendMail(mailOptions);
+  console.log("Email sent:", sentMessageInfo);
   console.log("Done checking new tournois with success");
   return {
     statusCode: 200,
