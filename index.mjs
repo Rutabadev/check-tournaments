@@ -6,6 +6,7 @@ import {
   PutItemCommand,
   QueryCommand,
 } from "@aws-sdk/client-dynamodb";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const { MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS } = process.env;
 
@@ -16,147 +17,126 @@ if (!MAILING_LIST || !EMAIL || !EMAIL_APP_PASS || !PASSWORD) {
 }
 
 const mailingList = MAILING_LIST.split(",");
-
-/**
- * @param {number} ms
- * @returns
- */
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let browser;
 
 export const handler = async () => {
   const dynamoDbClient = new DynamoDBClient({});
-
-  const { Items } = await dynamoDbClient.send(
-    new QueryCommand({
-      TableName: "tournaments",
-      KeyConditionExpression: "id = :id",
-      ExpressionAttributeValues: {
-        ":id": { S: "cookie" },
-      },
+  const startBrowserPromise = puppeteer
+    .launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
     })
+    .then((b) => {
+      browser = b;
+      return browser.newPage();
+    });
+
+  console.time("login");
+  const loginData = new URLSearchParams();
+  loginData.append("ajax", "connexionUser");
+  loginData.append("email", "etienner37@gmail.com");
+  loginData.append("pass", "7c3bK!k6ca4qbYy");
+  loginData.append("compte", "user");
+
+  const loginResponse = await fetch(
+    "https://toulousepadelclub.gestion-sports.com/traitement/connexion.php",
+    {
+      method: "POST",
+      body: loginData,
+    }
   );
-  const serializedCookies = Items?.[0]?.value?.S || "{}";
 
-  /**
-   * @type {{ PHPSESSID: string, COOK_COMPTE: string, expiry: string }}
-   */
-  let cookies = JSON.parse(serializedCookies);
+  const responseCookies = loginResponse.headers.get("set-cookie");
+  const phpSessid = responseCookies?.match(/PHPSESSID=(.*?);/)?.[1];
+  const cookCompte = responseCookies?.match(/COOK_COMPTE=(.*?);/)?.[1];
+  const cookCompteExpiration = responseCookies?.match(
+    /COOK_COMPTE=.*?; expires=(.*?);/
+  )?.[1];
 
-  if (new Date(cookies.expiry) < new Date()) {
-    const loginData = new URLSearchParams();
-    loginData.append("ajax", "connexionUser");
-    loginData.append("email", "etienner37@gmail.com");
-    loginData.append("pass", "7c3bK!k6ca4qbYy");
-    loginData.append("compte", "user");
+  const cookies = {
+    PHPSESSID: phpSessid ?? "",
+    COOK_COMPTE: cookCompte ?? "",
+    expiry: cookCompteExpiration ?? "",
+  };
+  console.timeEnd("login");
 
-    const loginResponse = await fetch(
-      "https://toulousepadelclub.gestion-sports.com/traitement/connexion.php",
-      {
-        method: "POST",
-        body: loginData,
-      }
-    );
-
-    const responseCookies = loginResponse.headers.get("set-cookie");
-    const phpSessid = responseCookies?.match(/PHPSESSID=(.*?);/)?.[1];
-    const cookCompte = responseCookies?.match(/COOK_COMPTE=(.*?);/)?.[1];
-    const cookCompteExpiration = responseCookies?.match(
-      /COOK_COMPTE=.*?; expires=(.*?);/
-    )?.[1];
-
-    cookies = {
-      PHPSESSID: phpSessid ?? "",
-      COOK_COMPTE: cookCompte ?? "",
-      expiry: cookCompteExpiration ?? "",
-    };
-
-    await dynamoDbClient.send(
-      new PutItemCommand({
-        TableName: "tournaments",
-        Item: {
-          id: { S: "cookie" },
-          value: { S: JSON.stringify(cookies) },
-        },
-      })
-    );
-
-    console.log("Updated cookies", cookies);
-  }
-
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath,
-    headless: chromium.headless,
-    ignoreHTTPSErrors: true,
-  });
+  let screenshot;
   /**
    * @type {import("puppeteer-core").Page}
    */
-  let page;
   try {
-    page = await browser.newPage();
-    let { expiry, ...actualCookies } = cookies;
-    const cookiesToSet = Object.entries(actualCookies).map(([name, value]) => ({
-      name,
-      value,
-      domain: "toulousepadelclub.gestion-sports.com",
-    }));
-    await page.setCookie(...cookiesToSet);
-
-    await page.goto(
-      "https://toulousepadelclub.gestion-sports.com/membre/events/event.html?event=1174"
-    );
+    console.time("fetch page");
+    const [page, tournoiPage] = await Promise.all([
+      startBrowserPromise,
+      fetch(
+        "https://toulousepadelclub.gestion-sports.com/membre/events/event.html?event=1174",
+        {
+          headers: {
+            cookie: `PHPSESSID=${cookies.PHPSESSID}; COOK_COMPTE=${cookies.COOK_COMPTE}`,
+          },
+        }
+      ).then((res) => res.text()),
+    ]);
+    await page.setContent(tournoiPage);
+    console.timeEnd("fetch page");
+    console.time("take screenshot");
+    page.screenshot().then((buffer) => (screenshot = buffer));
+    console.timeEnd("take screenshot");
     console.log("Go to tournoi page");
 
     // Tournoi
-    await page.waitForSelector(".card-body"), await wait(200);
-
+    await page.waitForSelector(".card-body");
     const tournoisDivs = await page.$$(".card-body");
     console.log("found tournois", tournoisDivs.length);
 
-    const tournois = await Promise.all(
-      tournoisDivs.map(async (tournoiDiv) => {
-        const [tournoiTitle, tournoiInfo, tournoiId] = (
-          await Promise.all([
-            tournoiDiv.$eval(
-              ".card-title",
-              (node) => /** @type {HTMLElement} */ (node).innerText
-            ),
-            tournoiDiv.evaluate(
-              (node) => /** @type {HTMLElement} */ (node).innerText
-            ),
-            tournoiDiv.$eval(
-              ".row",
-              (node) => /** @type {HTMLElement} */ (node).innerText
-            ),
-          ])
-        ).map((text) => text.replace(/\n/g, " "));
-        return {
-          data: tournoiInfo,
-          id: `${tournoiTitle}${tournoiId}${
-            tournoiInfo.toLowerCase().includes("complet") ? "_complet" : ""
-          }`,
-        };
-      })
-    );
+    console.time("check tournois");
+    const [tournois, serializedLatestTournamentsId] = await Promise.all([
+      Promise.all(
+        tournoisDivs.map(async (tournoiDiv) => {
+          const [tournoiTitle, tournoiInfo, tournoiId] = (
+            await Promise.all([
+              tournoiDiv.$eval(
+                ".card-title",
+                (node) => /** @type {HTMLElement} */ (node).innerText
+              ),
+              tournoiDiv.evaluate(
+                (node) => /** @type {HTMLElement} */ (node).innerText
+              ),
+              tournoiDiv.$eval(
+                ".row",
+                (node) => /** @type {HTMLElement} */ (node).innerText
+              ),
+            ])
+          ).map((text) => text.replace(/\n/g, " "));
+          return {
+            data: tournoiInfo,
+            id: `${tournoiTitle}${tournoiId}${
+              tournoiInfo.toLowerCase().includes("complet") ? "_complet" : ""
+            }`,
+          };
+        })
+      ),
+      dynamoDbClient
+        .send(
+          new QueryCommand({
+            TableName: "tournaments",
+            KeyConditionExpression: "id = :id",
+            ExpressionAttributeValues: {
+              ":id": { S: "latest" },
+            },
+          })
+        )
+        .then(({ Items }) => Items?.[0]?.value?.S || "[]"),
+    ]);
+    console.timeEnd("check tournois");
     console.log("tournois", tournois);
 
     const serializedTournoisId = JSON.stringify(
       tournois.map((tournoi) => tournoi.id)
     );
-
-    const { Items } = await dynamoDbClient.send(
-      new QueryCommand({
-        TableName: "tournaments",
-        KeyConditionExpression: "id = :id",
-        ExpressionAttributeValues: {
-          ":id": { S: "latest" },
-        },
-      })
-    );
-
-    const serializedLatestTournamentsId = Items?.[0]?.value?.S || "[]";
 
     if (serializedLatestTournamentsId === serializedTournoisId) {
       console.log("No new tournaments from last time");
@@ -166,6 +146,7 @@ export const handler = async () => {
       };
     }
 
+    console.time("save latest tournaments");
     await dynamoDbClient.send(
       new PutItemCommand({
         TableName: "tournaments",
@@ -175,6 +156,7 @@ export const handler = async () => {
         },
       })
     );
+    console.timeEnd("save latest tournaments");
 
     const latestTournaments = JSON.parse(serializedLatestTournamentsId);
     console.log("latestTournamentsArray", latestTournaments);
@@ -205,6 +187,7 @@ export const handler = async () => {
       };
     }
 
+    console.time("send email");
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -227,8 +210,26 @@ export const handler = async () => {
         `,
     };
     const sentMessageInfo = await transporter.sendMail(mailOptions);
+    console.timeEnd("send email");
     console.log("Email sent:", sentMessageInfo);
   } catch (error) {
+    if (screenshot) {
+      const s3 = new S3Client({});
+      const s3Params = {
+        Bucket: "rutabagafea",
+        Key: `padelito/screenshots/check-tournois-error-${new Date().toISOString()}.png`,
+        Body: screenshot,
+        ContentEncoding: "base64",
+        ContentType: "image/png",
+      };
+      try {
+        await s3.send(new PutObjectCommand(s3Params));
+        console.log("Screenshot saved to S3");
+      } catch (err) {
+        console.log("Error", err);
+      }
+    }
+
     throw error;
   }
   await browser.close();
