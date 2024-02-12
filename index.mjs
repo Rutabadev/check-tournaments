@@ -52,14 +52,10 @@ export const handler = async () => {
   const responseCookies = loginResponse.headers.get("set-cookie");
   const phpSessid = responseCookies?.match(/PHPSESSID=(.*?);/)?.[1];
   const cookCompte = responseCookies?.match(/COOK_COMPTE=(.*?);/)?.[1];
-  const cookCompteExpiration = responseCookies?.match(
-    /COOK_COMPTE=.*?; expires=(.*?);/
-  )?.[1];
 
   const cookies = {
     PHPSESSID: phpSessid ?? "",
     COOK_COMPTE: cookCompte ?? "",
-    expiry: cookCompteExpiration ?? "",
   };
   console.timeEnd("login");
 
