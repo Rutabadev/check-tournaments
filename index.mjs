@@ -1,11 +1,10 @@
-import { load } from "cheerio";
-import { createTransport } from "nodemailer";
 import {
   DynamoDBClient,
   PutItemCommand,
   QueryCommand,
 } from "@aws-sdk/client-dynamodb";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { load } from "cheerio";
+import { createTransport } from "nodemailer";
 
 const { MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS } = process.env;
 
@@ -135,6 +134,10 @@ export const handler = async () => {
     };
   }
 
+  const onlyFreedSpots = newTournaments.every((tournoi) =>
+    tournoi.data.toLowerCase().includes("places libérées")
+  );
+
   const transporter = createTransport({
     service: "gmail",
     auth: {
@@ -145,9 +148,8 @@ export const handler = async () => {
   const mailOptions = {
     from: "izi.rutabaga@gmail.com",
     to: mailingList.join(", "),
-    subject: "New tournaments",
+    subject: onlyFreedSpots? "Places libérées" : "Nouveaux tournois",
     html: `
-        <h1>New tournaments</h1>
         ${newTournaments
           .map(
             (newTournoi) =>
