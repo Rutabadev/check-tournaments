@@ -112,6 +112,7 @@ export const handler = async () => {
     .filter((tournoi) => !latestTournaments.includes(tournoi.id))
     .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
     .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
+    .filter((tournoi) => !tournoi.data.toLowerCase().includes("mixte"))
     .filter((tournoi) =>
       ["p25 ", "p100 ", "p250 "].some((level) =>
         tournoi.data.toLowerCase().includes(level)
