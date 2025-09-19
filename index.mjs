@@ -27,7 +27,7 @@ export const handler = async () => {
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath,
+    executablePath: await await chromium.executablePath(),
     headless: chromium.headless,
     ignoreHTTPSErrors: true,
   });
@@ -57,12 +57,10 @@ export const handler = async () => {
     });
 
     // Accueil
-    await Promise.all([
-      page.waitForNavigation(),
-      page.waitForSelector('a[href^="/membre/events/event.html"]'),
-    ]);
     console.log("Login done");
-    await wait(2000);
+    await page.waitForSelector("#tab-allevents");
+    await page.click("#tab-allevents");
+    await page.waitForSelector('a[href^="/membre/events/event.html"]');
     await page.click('a[href^="/membre/events/event.html"]');
     console.log("Go to tournoi page");
 
@@ -142,8 +140,9 @@ export const handler = async () => {
       .filter((tournoi) => !latestTournaments.includes(tournoi.id))
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
+      .filter((tournoi) => !tournoi.data.toLowerCase().includes("mixte"))
       .filter((tournoi) =>
-        ["p25 ", "p100 ", "p250 "].some((level) =>
+        ["p25 ", "p50", "p100 ", "p250 "].some((level) =>
           tournoi.data.toLowerCase().includes(level)
         )
       )
@@ -164,6 +163,10 @@ export const handler = async () => {
       };
     }
 
+    const onlyFreedSpots = newTournaments.every((tournoi) =>
+      tournoi.data.toLowerCase().includes("places libérées")
+    );
+
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -171,16 +174,34 @@ export const handler = async () => {
         pass: EMAIL_APP_PASS, // app-specific password since 2FA is enabled
       },
     });
+    const dayMap = [
+      "dimanche",
+      "lundi",
+      "mardi",
+      "mercredi",
+      "jeudi",
+      "vendredi",
+      "<b>samedi</b>",
+    ];
     const mailOptions = {
       from: "izi.rutabaga@gmail.com",
       to: mailingList.join(", "),
-      subject: "New tournaments",
+      subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
       html: `
-        <h1>New tournaments</h1>
         ${newTournaments
           .map(
             (newTournoi) =>
-              `<p style="font-size:1rem;line-height:1.5rem">${newTournoi.data}</p>`
+              `<p style="font-size:1rem;line-height:1.5rem">${newTournoi.data.replace(
+                /.*(\d{2}\/\d{2}\/\d{4}).*/,
+                (all, frDate) => {
+                  const [day, month, year] = frDate.split("/");
+                  const date = `${month}/${day}/${year}`;
+                  const allNoDate = all.replace(`${frDate} `, "");
+                  return `${
+                    dayMap[new Date(date).getDay()]
+                  } ${frDate} ${allNoDate}`;
+                }
+              )}</p>`
           )
           .join("")}
         `,
