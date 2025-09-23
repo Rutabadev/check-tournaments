@@ -55,17 +55,19 @@ export const handler = async () => {
         )[0]
         .click();
     });
+    console.log("Login done");
 
     // Accueil
-    console.log("Login done");
     await page.waitForSelector("#tab-allevents");
     await page.click("#tab-allevents");
+    await wait(200);
     await page.waitForSelector('a[href^="/membre/events/event.html"]');
     await page.click('a[href^="/membre/events/event.html"]');
-    console.log("Go to tournoi page");
 
     // Tournoi
-    await page.waitForSelector(".card-body"), await wait(200);
+    console.log("Go to tournoi page");
+    await page.waitForSelector(".card-body");
+    await wait(200);
 
     const tournoisDivs = await page.$$(".card-body");
     console.log("found tournois", tournoisDivs.length);
