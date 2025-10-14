@@ -144,9 +144,9 @@ export const handler = async () => {
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
       .filter((tournoi) => !tournoi.data.toLowerCase().includes("mixte"))
       .filter((tournoi) =>
-        ["p25 ", "p50", "p100 ", "p250 "].some((level) =>
-          tournoi.data.toLowerCase().includes(level)
-        )
+        ["p50", "p100", "p250"]
+          .map((level) => `${level} `)
+          .some((level) => tournoi.data.toLowerCase().includes(level))
       )
       .map((tournoi) => {
         // notify if tournoi was previously full but now has spots
