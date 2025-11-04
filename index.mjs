@@ -190,10 +190,12 @@ export const handler = async () => {
       to: mailingList.join(", "),
       subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
       html: `
-        ${newTournaments
-          .map(
-            (newTournoi) =>
-              `<p style="font-size:1rem;line-height:1.5rem">${newTournoi.data.replace(
+      ${newTournaments
+        .map(
+          (newTournoi) =>
+            `<p style="font-size:1rem;line-height:1.5rem">${(() => {
+              const data = newTournoi.data;
+              let processed = data.replace(
                 /.*(\d{2}\/\d{2}\/\d{4}).*/,
                 (all, frDate) => {
                   const [day, month, year] = frDate.split("/");
@@ -203,10 +205,19 @@ export const handler = async () => {
                     dayMap[new Date(date).getDay()]
                   } ${frDate} ${allNoDate}`;
                 }
-              )}</p>`
-          )
-          .join("")}
-        `,
+              );
+              const timeMatch = processed.match(/(\d{2})h\d{2}/);
+              const isNocturnal =
+                (timeMatch && parseInt(timeMatch[1]) >= 18) ||
+                processed.toLowerCase().includes("nocturne");
+              if (isNocturnal) {
+                processed = processed.replace(/^(\S+) /, "$1 <b>nocturne</b> ");
+              }
+              return processed;
+            })()}</p>`
+        )
+        .join("")}
+      `,
     };
     const sentMessageInfo = await transporter.sendMail(mailOptions);
     console.log("Email sent:", sentMessageInfo);
