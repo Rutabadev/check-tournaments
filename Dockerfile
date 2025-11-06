@@ -1,6 +1,6 @@
-FROM public.ecr.aws/lambda/nodejs:18
+FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:20
 
-COPY package*.json index.mjs ./
+COPY package*.json index.mjs .env ./
 RUN npm i --production
 
 CMD [ "index.handler" ]

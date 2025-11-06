@@ -5,6 +5,7 @@
   "main": "index.mjs",
   "type": "module",
   "scripts": {
+    "start": "NODE_ENV=local node run-local.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,11 +13,12 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.445.0",
-    "@sparticuz/chromium": "^109.0.0",
+    "@sparticuz/chromium": "^123.0.1",
+    "dotenv": "^17.2.3",
     "nodemailer": "^6.9.7",
     "puppeteer-core": "^19.4.0"
   },
   "devDependencies": {
-    "@types/puppeteer-core": "^7.0.4"
+    "puppeteer": "^21.0.0"
   }
 }
