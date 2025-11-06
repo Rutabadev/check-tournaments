@@ -13,7 +13,11 @@ if (isLocal) {
   puppeteer = (await import("puppeteer-core")).default;
   chromium = (await import("@sparticuz/chromium")).default;
 }
-console.log("Running in", isLocal ? "local" : `lambda${isProduction ? " (production)" : ""}`, "mode");
+console.log(
+  "Running in",
+  isLocal ? "local" : `lambda${isProduction ? " (production)" : ""}`,
+  "mode"
+);
 import nodemailer from "nodemailer";
 import {
   DynamoDBClient,
@@ -87,6 +91,7 @@ export const handler = async () => {
           )[0]
           .click();
       });
+      // This is needed for the next operation to not timeout
       await page.waitForNavigation({
         waitUntil: "networkidle0",
         timeout: 10000,
@@ -101,7 +106,6 @@ export const handler = async () => {
     try {
       await page.waitForSelector("#tab-allevents");
       await page.click("#tab-allevents");
-      await wait(1000);
       await page.waitForFunction(
         () => !!document.querySelector('a[href^="/membre/events/event.html"]')
       );
