@@ -200,7 +200,7 @@ export const handler = async () => {
         };
       }
 
-      if (process.env.DEBUG) {
+      if (!process.env.DEBUG) {
         await dynamoDbClient.send(
           new PutItemCommand({
             TableName: "tournaments",
@@ -210,6 +210,7 @@ export const handler = async () => {
             },
           })
         );
+        console.log("updated db");
       }
 
       const latestTournaments = JSON.parse(serializedLatestTournamentsId);

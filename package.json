@@ -5,8 +5,7 @@
   "main": "index.mjs",
   "type": "module",
   "scripts": {
-    "start": "NODE_ENV=local node run-local.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "NODE_ENV=local node run-local.mjs"
   },
   "keywords": [],
   "author": "",
