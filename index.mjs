@@ -221,6 +221,7 @@ export const handler = async () => {
         .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
         .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
         .filter((tournoi) => !tournoi.data.toLowerCase().includes("mixte"))
+        .filter((tournoi) => !tournoi.data.toLowerCase().includes("+45"))
         .filter((tournoi) =>
           ["p50", "p100", "p250"]
             .map((level) => `${level} `)
