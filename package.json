@@ -12,12 +12,12 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.445.0",
-    "@sparticuz/chromium": "^123.0.1",
+    "@sparticuz/chromium": "^132.0.0",
     "dotenv": "^17.2.3",
     "nodemailer": "^6.9.7",
-    "puppeteer-core": "^19.4.0"
+    "puppeteer-core": "^24.1.1"
   },
   "devDependencies": {
-    "puppeteer": "^21.0.0"
+    "puppeteer": "^24.1.1"
   }
 }

@@ -29,3 +29,7 @@ You need to setup the following environment variables :
 - `EMAIL` : the email you use to login to padel website
 - `PASSWORD` : the password you use to login to padel website
 - `MAILING_LIST` : the email addresses to send the results to (comma separated)
+
+## Layer
+
+Uses padelito and nodemailer layers from AWS. See padelito project : https://github.com/Rutabadev/padelito
