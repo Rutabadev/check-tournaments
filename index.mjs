@@ -102,71 +102,55 @@ export const handler = async () => {
       throw new Error("Login process failed");
     }
 
-    // Accueil
+    // Close welcome popup
     try {
-      await page.waitForSelector("#tab-allevents");
-      await page.click("#tab-allevents");
-      await page.waitForFunction(
-        () => !!document.querySelector('a[href^="/membre/events/event.html"]')
+      console.log("Close welcome popup");
+      const closePopupButton = await page.waitForSelector(
+        "app-welcome-popup button"
       );
-      await page.click('a[href^="/membre/events/event.html"]');
+      await closePopupButton.click();
     } catch (error) {
-      console.error("Navigation to events failed:", error);
-      throw new Error("Failed to navigate to events page");
+      console.error("Could not close welcome popup", error);
+      throw new Error("Failed to close welcome popup");
     }
 
-    // Tournoi
-    console.log("Go to tournoi page");
+    // Evenements page navigation
     try {
-      await page.waitForSelector(".card-body");
-      await wait(200);
-
-      const tournoisDivs = await page.$$(".card-body");
-      console.log("found tournois", tournoisDivs.length);
-
-      if (tournoisDivs.length === 0) {
-        console.log("No tournaments found");
-        return {
-          statusCode: 200,
-          body: JSON.stringify("No tournaments available"),
-        };
-      }
-
-      const tournois = await Promise.all(
-        tournoisDivs.map(async (tournoiDiv) => {
-          try {
-            const [tournoiTitle, tournoiInfo, tournoiId] = (
-              await Promise.all([
-                tournoiDiv.$eval(
-                  ".card-title",
-                  (node) => /** @type {HTMLElement} */ (node).innerText
-                ),
-                tournoiDiv.evaluate(
-                  (node) => /** @type {HTMLElement} */ (node).innerText
-                ),
-                tournoiDiv.$eval(
-                  ".row",
-                  (node) => /** @type {HTMLElement} */ (node).innerText
-                ),
-              ])
-            ).map((text) => text.replace(/\n/g, " "));
-            return {
-              data: tournoiInfo,
-              id: `${tournoiTitle}${tournoiId}${
-                tournoiInfo.toLowerCase().includes("complet") ? "_complet" : ""
-              }`,
-            };
-          } catch (error) {
-            console.error("Error parsing tournament data:", error);
-            return null;
-          }
-        })
-      ).then((results) => results.filter(Boolean)); // Filter out nulls
-      console.log("tournois", tournois);
-
-      const serializedTournoisId = JSON.stringify(
-        tournois.map((tournoi) => tournoi.id)
+      console.log("Go to reservation page");
+      await page.goto(
+        "https://toulousepadelclub.gestion-sports.com/appli/Évènements"
       );
+    } catch (error) {
+      console.error("Navigation to evenements page failed:", error);
+      throw new Error("Failed to navigate to evenements page");
+    }
+
+    await page.waitForSelector(
+      "app-evenements .w-100.contain app-input-search"
+    );
+    const tournoisDivs = await page.$$(
+      "app-evenements .w-100.contain app-input-search ~ div.mb-20"
+    );
+
+    const tournois = await Promise.all(
+      tournoisDivs.map(async (tournoiDiv) => {
+        try {
+          const tournoiInfo = await tournoiDiv.evaluate(
+            (node) => /** @type {HTMLElement} */ (node).innerText
+          );
+          const tournoiInfoProcessed = tournoiInfo.replace(/\n/g, " ");
+          const isFull = tournoiInfoProcessed.match(/\b0\/\d+\s+p\./i); // matches 0 slot left like "0/16"
+          return `${tournoiInfoProcessed}${isFull ? "_complet" : ""}`;
+        } catch (error) {
+          console.error("Error parsing tournament data:", error);
+          return null;
+        }
+      })
+    ).then((results) => results.filter(Boolean)); // Filter out nulls
+    console.log("tournois", tournois);
+
+    try {
+      const serializedTournoisId = JSON.stringify(tournois);
 
       const dynamoDbClient = new DynamoDBClient({
         region: process.env.AWS_REGION,
@@ -188,9 +172,7 @@ export const handler = async () => {
         })
       );
 
-      const serializedLatestTournamentsId = process.env.DEBUG
-        ? "[]"
-        : Items?.[0]?.tournaments?.S || "[]";
+      const serializedLatestTournamentsId = Items?.[0]?.tournaments?.S || "[]";
 
       if (serializedLatestTournamentsId === serializedTournoisId) {
         console.log("No new tournaments from last time");
@@ -217,20 +199,20 @@ export const handler = async () => {
       console.log("latestTournamentsArray", latestTournaments);
 
       const newTournaments = tournois
-        .filter((tournoi) => !latestTournaments.includes(tournoi.id))
-        .filter((tournoi) => !tournoi.data.toLowerCase().includes("complet"))
-        .filter((tournoi) => !tournoi.data.toLowerCase().includes("femme"))
-        .filter((tournoi) => !tournoi.data.toLowerCase().includes("mixte"))
-        .filter((tournoi) => !tournoi.data.toLowerCase().includes("+45"))
+        .filter((tournoi) => !latestTournaments.includes(tournoi))
+        .filter((tournoi) => !tournoi.endsWith("_complet")) // Filter out full tournaments
+        .filter((tournoi) => !tournoi.toLowerCase().includes("femme"))
+        .filter((tournoi) => !tournoi.toLowerCase().includes("mixte"))
+        .filter((tournoi) => !tournoi.toLowerCase().includes("+45"))
         .filter((tournoi) =>
           ["p50", "p100", "p250"]
             .map((level) => `${level} `)
-            .some((level) => tournoi.data.toLowerCase().includes(level))
+            .some((level) => tournoi.toLowerCase().includes(level))
         )
         .map((tournoi) => {
           // notify if tournoi was previously full but now has spots
-          if (latestTournaments.includes(`${tournoi.id}_complet`)) {
-            return { ...tournoi, data: `Places libérées : ${tournoi.data}` };
+          if (latestTournaments.includes(`${tournoi}_complet`)) {
+            return `Places libérées : ${tournoi}`;
           }
           return tournoi;
         });
@@ -245,7 +227,7 @@ export const handler = async () => {
       }
 
       const onlyFreedSpots = newTournaments.every((tournoi) =>
-        tournoi.data.toLowerCase().includes("places libérées")
+        tournoi.toLowerCase().includes("places libérées")
       );
 
       const transporter = nodemailer.createTransport({
@@ -255,15 +237,15 @@ export const handler = async () => {
           pass: EMAIL_APP_PASS, // app-specific password since 2FA is enabled
         },
       });
-      const dayMap = [
-        "dimanche",
-        "lundi",
-        "mardi",
-        "mercredi",
-        "jeudi",
-        "vendredi",
-        "<b>samedi</b>",
-      ];
+      const dayAbbrevMap = {
+        "lun.": "lundi",
+        "mar.": "mardi",
+        "mer.": "mercredi",
+        "jeu.": "jeudi",
+        "ven.": "vendredi",
+        "sam.": "<b>samedi</b>",
+        "dim.": "dimanche",
+      };
       const mailOptions = {
         from: "izi.rutabaga@gmail.com",
         to: mailingList.join(", "),
@@ -271,31 +253,71 @@ export const handler = async () => {
         html: `
         ${newTournaments
           .map(
-            (newTournoi) =>
+            (data) =>
               `<p style="font-size:1rem;line-height:1.5rem">${(() => {
-                const data = newTournoi.data;
-                let processed = data.replace(
-                  /.*(\d{2}\/\d{2}\/\d{4}).*/,
-                  (all, frDate) => {
-                    const [day, month, year] = frDate.split("/");
-                    const date = `${month}/${day}/${year}`;
-                    const allNoDate = all.replace(`${frDate} `, "");
-                    return `${
-                      dayMap[new Date(date).getDay()]
-                    } ${frDate} ${allNoDate}`;
-                  }
+                // Extract prefix if present (e.g., "Places libérées : ")
+                const prefixMatch = data.match(/^Places libérées\s*:\s*/i);
+                const prefix = prefixMatch ? "Places libérées: " : "";
+                const cleanData = data.replace(/^Places libérées\s*:\s*/i, "");
+
+                // Extract level (P50, P100, P250)
+                const levelMatch = cleanData.match(/(P\d+)/i);
+                const level = levelMatch ? levelMatch[1] : "";
+
+                // Extract nocturne
+                const nocturneMatchedFromText = cleanData.match(/nocturne/i);
+
+                // Extract spots (X/Y p. restantes or p. disponibles)
+                const spotsMatch = cleanData.match(/(\d+\/\d+\s+p\.\s+\w+)/i);
+                const spots = spotsMatch ? spotsMatch[1] : "";
+
+                // Extract date and time (format: "Day. DD Month.  HHhMM - HHhMM")
+                let processedDateTime = "";
+                const dateMatch = cleanData.match(
+                  /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
                 );
-                const timeMatch = processed.match(/(\d{2})h\d{2}/);
-                const isNocturnal =
-                  (timeMatch && parseInt(timeMatch[1]) >= 18) ||
-                  processed.toLowerCase().includes("nocturne");
-                if (isNocturnal) {
-                  processed = processed.replace(
-                    /^(\S+) /,
-                    "$1 <b>nocturne</b> "
+                if (dateMatch) {
+                  const [
+                    _fullMatch,
+                    dayAbbrev,
+                    dayNum,
+                    monthAbbrev,
+                    hour,
+                    min,
+                  ] = dateMatch;
+                  const dayLower = dayAbbrev.toLowerCase();
+                  const day = dayAbbrevMap[dayLower] || dayLower;
+
+                  let timeStr = `${hour}h${min}`;
+
+                  // Extract end time if present (format: " - HHhMM")
+                  const timeEndMatch = cleanData.match(
+                    /(\d{2})h(\d{2})\s*-\s*(\d{2})h(\d{2})/
                   );
+                  if (timeEndMatch) {
+                    const [, , , endHour, endMin] = timeEndMatch;
+                    timeStr = `${hour}h${min}-${endHour}h${endMin}`;
+                  }
+
+                  processedDateTime = `${day} ${dayNum} ${monthAbbrev} ${timeStr}`;
                 }
-                return processed;
+
+                // Check if nocturnal
+                const isNocturnal =
+                  (cleanData.match(/(\d{2})h\d{2}/) &&
+                    parseInt(cleanData.match(/(\d{2})h\d{2}/)[1]) >= 18) ||
+                  cleanData.toLowerCase().includes("nocturne");
+
+                // Build final output
+                let outputParts = [];
+                if (isNocturnal || nocturneMatchedFromText) {
+                  outputParts.push(`<b>nocturne</b>`);
+                }
+                outputParts.push(processedDateTime, level);
+                outputParts.push(spots);
+
+                const output = outputParts.filter(Boolean).join(" ");
+                return prefix + output;
               })()}</p>`
           )
           .join("")}
