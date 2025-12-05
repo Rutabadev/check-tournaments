@@ -132,21 +132,38 @@ export const handler = async () => {
       "app-evenements .w-100.contain app-input-search ~ div.mb-20"
     );
 
-    const tournois = await Promise.all(
+    const tournoisFull = await Promise.all(
       tournoisDivs.map(async (tournoiDiv) => {
         try {
           const tournoiInfo = await tournoiDiv.evaluate(
             (node) => /** @type {HTMLElement} */ (node).innerText
           );
           const tournoiInfoProcessed = tournoiInfo.replace(/\n/g, " ");
-          const isFull = tournoiInfoProcessed.match(/\b0\/\d+\s+p\./i); // matches 0 slot left like "0/16"
-          return `${tournoiInfoProcessed}${isFull ? "_complet" : ""}`;
+          // Full if 0 slots available, match 0/16, 0/12...
+          const isFull = tournoiInfoProcessed.match(/\b0\/\d+\s+p\./i);
+
+          // Remove slot counts (e.g., "1/12 p. restantes" or "2/12 p. disponibles") before storing
+          const tournoiWithoutSlots = tournoiInfoProcessed
+            .replace(/\d+\/\d+\s+p\.\s+\w+/gi, "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          return {
+            stripped: `${tournoiWithoutSlots}${isFull ? "_complet" : ""}`,
+            full: tournoiInfoProcessed,
+          };
         } catch (error) {
           console.error("Error parsing tournament data:", error);
           return null;
         }
       })
     ).then((results) => results.filter(Boolean)); // Filter out nulls
+
+    // Create a map from stripped to full for later lookup
+    const fullTournoisMap = new Map(
+      tournoisFull.map((t) => [t.stripped, t.full])
+    );
+    const tournois = tournoisFull.map((t) => t.stripped);
     console.log("tournois", tournois);
 
     try {
@@ -182,18 +199,18 @@ export const handler = async () => {
         };
       }
 
-      if (!process.env.DEBUG) {
-        await dynamoDbClient.send(
-          new PutItemCommand({
-            TableName: "tournaments",
-            Item: {
-              id: { S: "latest" },
-              tournaments: { S: serializedTournoisId },
-            },
-          })
-        );
-        console.log("updated db");
-      }
+      // if (!process.env.DEBUG) {
+      await dynamoDbClient.send(
+        new PutItemCommand({
+          TableName: "tournaments",
+          Item: {
+            id: { S: "latest" },
+            tournaments: { S: serializedTournoisId },
+          },
+        })
+      );
+      console.log("updated db");
+      // }
 
       const latestTournaments = JSON.parse(serializedLatestTournamentsId);
       console.log("latestTournamentsArray", latestTournaments);
@@ -247,81 +264,82 @@ export const handler = async () => {
         "dim.": "dimanche",
       };
       const mailOptions = {
-        from: "izi.rutabaga@gmail.com",
-        to: mailingList.join(", "),
-        subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
-        html: `
-        ${newTournaments
-          .map(
-            (data) =>
-              `<p style="font-size:1rem;line-height:1.5rem">${(() => {
-                // Extract prefix if present (e.g., "Places libérées : ")
-                const prefixMatch = data.match(/^Places libérées\s*:\s*/i);
-                const prefix = prefixMatch ? "Places libérées: " : "";
-                const cleanData = data.replace(/^Places libérées\s*:\s*/i, "");
+       from: "izi.rutabaga@gmail.com",
+       to: mailingList.join(", "),
+       subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
+       html: `
+       ${newTournaments
+         .map(
+           (data) =>
+             `<p style="font-size:1rem;line-height:1.5rem">${(() => {
+               // Extract prefix if present (e.g., "Places libérées : ")
+               const prefixMatch = data.match(/^Places libérées\s*:\s*/i);
+               const prefix = prefixMatch ? "Places libérées: " : "";
+               const cleanData = data.replace(/^Places libérées\s*:\s*/i, "");
 
-                // Extract level (P50, P100, P250)
-                const levelMatch = cleanData.match(/(P\d+)/i);
-                const level = levelMatch ? levelMatch[1] : "";
+               // Extract level (P50, P100, P250)
+               const levelMatch = cleanData.match(/(P\d+)/i);
+               const level = levelMatch ? levelMatch[1] : "";
 
-                // Extract nocturne
-                const nocturneMatchedFromText = cleanData.match(/nocturne/i);
+               // Extract nocturne
+               const nocturneMatchedFromText = cleanData.match(/nocturne/i);
 
-                // Extract spots (X/Y p. restantes or p. disponibles)
-                const spotsMatch = cleanData.match(/(\d+\/\d+\s+p\.\s+\w+)/i);
-                const spots = spotsMatch ? spotsMatch[1] : "";
+               // Extract remaining slots from the full tournament data
+               const fullTournamentData = fullTournoisMap.get(cleanData) || "";
+               const spotsMatch = fullTournamentData.match(/(\d+\/\d+\s+p\.\s+\w+)/i);
+               const spots = spotsMatch ? spotsMatch[1] : "";
 
-                // Extract date and time (format: "Day. DD Month.  HHhMM - HHhMM")
-                let processedDateTime = "";
-                const dateMatch = cleanData.match(
-                  /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
-                );
-                if (dateMatch) {
-                  const [
-                    _fullMatch,
-                    dayAbbrev,
-                    dayNum,
-                    monthAbbrev,
-                    hour,
-                    min,
-                  ] = dateMatch;
-                  const dayLower = dayAbbrev.toLowerCase();
-                  const day = dayAbbrevMap[dayLower] || dayLower;
+               // Extract date and time (format: "Day. DD Month.  HHhMM - HHhMM")
+               let processedDateTime = "";
+               const dateMatch = cleanData.match(
+                 /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
+               );
+               if (dateMatch) {
+                 const [
+                   _fullMatch,
+                   dayAbbrev,
+                   dayNum,
+                   monthAbbrev,
+                   hour,
+                   min,
+                 ] = dateMatch;
+                 const dayLower = dayAbbrev.toLowerCase();
+                 const day = dayAbbrevMap[dayLower] || dayLower;
 
-                  let timeStr = `${hour}h${min}`;
+                 let timeStr = `${hour}h${min}`;
 
-                  // Extract end time if present (format: " - HHhMM")
-                  const timeEndMatch = cleanData.match(
-                    /(\d{2})h(\d{2})\s*-\s*(\d{2})h(\d{2})/
-                  );
-                  if (timeEndMatch) {
-                    const [, , , endHour, endMin] = timeEndMatch;
-                    timeStr = `${hour}h${min}-${endHour}h${endMin}`;
-                  }
+                 // Extract end time if present (format: " - HHhMM")
+                 const timeEndMatch = cleanData.match(
+                   /(\d{2})h(\d{2})\s*-\s*(\d{2})h(\d{2})/
+                 );
+                 if (timeEndMatch) {
+                   const [, , , endHour, endMin] = timeEndMatch;
+                   timeStr = `${hour}h${min}-${endHour}h${endMin}`;
+                 }
 
-                  processedDateTime = `${day} ${dayNum} ${monthAbbrev} ${timeStr}`;
-                }
+                 processedDateTime = `${day} ${dayNum} ${monthAbbrev} ${timeStr}`;
+               }
 
-                // Check if nocturnal
-                const isNocturnal =
-                  (cleanData.match(/(\d{2})h\d{2}/) &&
-                    parseInt(cleanData.match(/(\d{2})h\d{2}/)[1]) >= 18) ||
-                  cleanData.toLowerCase().includes("nocturne");
+               // Check if nocturnal
+               const isNocturnal =
+                 (cleanData.match(/(\d{2})h\d{2}/) &&
+                   parseInt(cleanData.match(/(\d{2})h\d{2}/)[1]) >= 18) ||
+                 cleanData.toLowerCase().includes("nocturne");
 
-                // Build final output
-                let outputParts = [];
-                if (isNocturnal || nocturneMatchedFromText) {
-                  outputParts.push(`<b>nocturne</b>`);
-                }
-                outputParts.push(processedDateTime, level);
-                outputParts.push(spots);
+               // Build final output
+               let outputParts = [];
+               if (isNocturnal || nocturneMatchedFromText) {
+                 outputParts.push(`<b>nocturne</b>`);
+               }
+               outputParts.push(processedDateTime, level);
+               outputParts.push(spots);
 
-                const output = outputParts.filter(Boolean).join(" ");
-                return prefix + output;
-              })()}</p>`
-          )
-          .join("")}
-        `,
+               const output = outputParts.filter(Boolean).join(" ");
+               return prefix + output;
+             })()}</p>`
+         )
+         .join("")}
+       `,
       };
       const sentMessageInfo = await transporter.sendMail(mailOptions);
       console.log("Email sent:", sentMessageInfo);
