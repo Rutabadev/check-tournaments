@@ -139,12 +139,18 @@ export const handler = async () => {
             (node) => /** @type {HTMLElement} */ (node).innerText
           );
           const tournoiInfoProcessed = tournoiInfo.replace(/\n/g, " ");
-          // Full if 0 slots available, match 0/16, 0/12...
-          const isFull = tournoiInfoProcessed.match(/\b0\/\d+\s+p\./i);
+          // Full if 0 slots available - extract slot count section and check first number
+          // Match after the time range (e.g., "21h00 - 23h30" or "07h50 - 12h00")
+          const slotsSectionMatch = tournoiInfoProcessed.match(
+            /\d{2}h\d{2}\s*-\s*\d{2}h\d{2}\s+(.+?)(?:\s+Je m'inscris)?$/i
+          );
+          const slotsSection = slotsSectionMatch ? slotsSectionMatch[1] : "";
+          const firstNumberMatch = slotsSection.match(/^(\d+)/);
+          const isFull = firstNumberMatch && firstNumberMatch[1] === "0";
 
-          // Remove slot counts (e.g., "1/12 p. restantes" or "2/12 p. disponibles") before storing
+          // Remove slot counts between the time and "Je m'inscris" or end of string
           const tournoiWithoutSlots = tournoiInfoProcessed
-            .replace(/\d+\/\d+\s+p\.\s+\w+/gi, "")
+            .replace(/(\d{2}h\d{2})\s+.+?(?:\s+Je m'inscris)?$/i, "$1")
             .replace(/\s+/g, " ")
             .trim();
 
@@ -199,18 +205,18 @@ export const handler = async () => {
         };
       }
 
-      // if (!process.env.DEBUG) {
-      await dynamoDbClient.send(
-        new PutItemCommand({
-          TableName: "tournaments",
-          Item: {
-            id: { S: "latest" },
-            tournaments: { S: serializedTournoisId },
-          },
-        })
-      );
-      console.log("updated db");
-      // }
+      if (!process.env.DEBUG) {
+        await dynamoDbClient.send(
+          new PutItemCommand({
+            TableName: "tournaments",
+            Item: {
+              id: { S: "latest" },
+              tournaments: { S: serializedTournoisId },
+            },
+          })
+        );
+        console.log("updated db");
+      }
 
       const latestTournaments = JSON.parse(serializedLatestTournamentsId);
       console.log("latestTournamentsArray", latestTournaments);
@@ -264,10 +270,10 @@ export const handler = async () => {
         "dim.": "dimanche",
       };
       const mailOptions = {
-       from: "izi.rutabaga@gmail.com",
-       to: mailingList.join(", "),
-       subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
-       html: `
+        from: "izi.rutabaga@gmail.com",
+        to: mailingList.join(", "),
+        subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
+        html: `
        ${newTournaments
          .map(
            (data) =>
@@ -285,9 +291,12 @@ export const handler = async () => {
                const nocturneMatchedFromText = cleanData.match(/nocturne/i);
 
                // Extract remaining slots from the full tournament data
+               // Match everything between the time (HHhMM) and either "Je m'inscris" or end of string
                const fullTournamentData = fullTournoisMap.get(cleanData) || "";
-               const spotsMatch = fullTournamentData.match(/(\d+\/\d+\s+p\.\s+\w+)/i);
-               const spots = spotsMatch ? spotsMatch[1] : "";
+               const spotsMatch = fullTournamentData.match(
+                 /\d{2}h\d{2}\s+(.+?)(?:\s+Je m'inscris)?$/i
+               );
+               const spots = spotsMatch ? spotsMatch[1].trim() : "";
 
                // Extract date and time (format: "Day. DD Month.  HHhMM - HHhMM")
                let processedDateTime = "";
@@ -295,14 +304,8 @@ export const handler = async () => {
                  /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
                );
                if (dateMatch) {
-                 const [
-                   _fullMatch,
-                   dayAbbrev,
-                   dayNum,
-                   monthAbbrev,
-                   hour,
-                   min,
-                 ] = dateMatch;
+                 const [_fullMatch, dayAbbrev, dayNum, monthAbbrev, hour, min] =
+                   dateMatch;
                  const dayLower = dayAbbrev.toLowerCase();
                  const day = dayAbbrevMap[dayLower] || dayLower;
 
@@ -339,7 +342,7 @@ export const handler = async () => {
              })()}</p>`
          )
          .join("")}
-       `,
+        `,
       };
       const sentMessageInfo = await transporter.sendMail(mailOptions);
       console.log("Email sent:", sentMessageInfo);
