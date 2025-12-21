@@ -44,11 +44,12 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Login and scrape tournaments for a given subdomain
- * @param {import("puppeteer-core").Page} page
+ * @param {import("puppeteer-core").Browser} browser
  * @param {string} subdomain
  * @returns {Promise<{stripped: string, full: string, subdomain: string}[]>}
  */
-async function scrapeTournaments(page, subdomain) {
+async function scrapeTournaments(browser, subdomain) {
+  const page = await browser.newPage();
   const baseUrl = `https://${subdomain}.gestion-sports.com`;
 
   try {
@@ -136,6 +137,7 @@ async function scrapeTournaments(page, subdomain) {
   ).then((results) => results.filter(Boolean));
 
   console.log(`[${subdomain}] Found ${tournoisFull.length} tournaments`);
+  await page.close();
   return tournoisFull;
 }
 
@@ -166,22 +168,17 @@ export const handler = async () => {
         ignoreHTTPSErrors: true,
       });
     }
-    /**
-     * @type {import("puppeteer-core").Page}
-     */
-    const page = await browser.newPage();
+    // Scrape tournaments from all subdomains in parallel
+    const tournoisResults = await Promise.all(
+      SUBDOMAINS.map((subdomain) =>
+        scrapeTournaments(browser, subdomain).catch((error) => {
+          console.error(`Failed to scrape ${subdomain}:`, error);
+          throw error;
+        })
+      )
+    );
 
-    // Scrape tournaments from all subdomains
-    const allTournoisFull = [];
-    for (const subdomain of SUBDOMAINS) {
-      try {
-        const tournoisFull = await scrapeTournaments(page, subdomain);
-        allTournoisFull.push(...tournoisFull);
-      } catch (error) {
-        console.error(`Failed to scrape ${subdomain}:`, error);
-        throw error;
-      }
-    }
+    const allTournoisFull = tournoisResults.flat();
 
     // Create a map from stripped to full for later lookup
     const fullTournoisMap = new Map(
