@@ -79,16 +79,41 @@ async function scrapeTournaments(browser, subdomain) {
     throw new Error(`Login failed for ${subdomain}`);
   }
 
-  // Close welcome popup
+  // Close welcome popup (optional, may not always appear)
   try {
     console.log(`[${subdomain}] Close welcome popup`);
     const closePopupButton = await page.waitForSelector(
-      "app-welcome-popup button"
+      "app-welcome-popup button",
+      { timeout: 2000 }
     );
-    await closePopupButton.click();
+    if (closePopupButton) {
+      await closePopupButton.click();
+    }
   } catch (error) {
-    console.error(`[${subdomain}] Could not close welcome popup`, error);
-    throw new Error(`Failed to close welcome popup for ${subdomain}`);
+    console.log(
+      `[${subdomain}] Welcome popup not found (this is okay, continuing...)`
+    );
+    // Notify admin about missing popup
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: "izi.rutabaga@gmail.com",
+          pass: EMAIL_APP_PASS,
+        },
+      });
+      await transporter.sendMail({
+        from: "izi.rutabaga@gmail.com",
+        to: "etienner37@gmail.com",
+        subject: `[Check Tournaments] No popup found on ${subdomain}`,
+        html: `<p>The welcome popup was not found when scraping <strong>${subdomain}</strong>. This may indicate a site change or issue with the scraper.</p>`,
+      });
+    } catch (emailError) {
+      console.error(
+        `[${subdomain}] Failed to send popup notification email:`,
+        emailError
+      );
+    }
   }
 
   // Evenements page navigation
