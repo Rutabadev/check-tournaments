@@ -329,7 +329,8 @@ export const handler = async () => {
         const spots = spotsMatch ? spotsMatch[1].trim() : "";
 
         // Extract date and time
-        let processedDateTime = "";
+        let processedDate = "";
+        let timeStr = "";
         const dateMatch = cleanData.match(
           /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
         );
@@ -339,7 +340,7 @@ export const handler = async () => {
           const dayLower = dayAbbrev.toLowerCase();
           const day = dayAbbrevMap[dayLower] || dayLower;
 
-          let timeStr = `${hour}h${min}`;
+          timeStr = `${hour}h${min}`;
 
           const timeEndMatch = cleanData.match(
             /(\d{2})h(\d{2})\s*-\s*(\d{2})h(\d{2})/
@@ -349,7 +350,7 @@ export const handler = async () => {
             timeStr = `${hour}h${min}-${endHour}h${endMin}`;
           }
 
-          processedDateTime = `${day} ${dayNum} ${monthAbbrev} ${timeStr}`;
+          processedDate = `${day} ${dayNum} ${monthAbbrev}`;
         }
 
         // Check if nocturnal
@@ -363,7 +364,9 @@ export const handler = async () => {
         if (isNocturnal || nocturneMatchedFromText) {
           outputParts.push(`<b>nocturne</b>`);
         }
-        outputParts.push(processedDateTime, level);
+        outputParts.push(processedDate);
+        outputParts.push(level);
+        outputParts.push(timeStr);
         outputParts.push(spots);
 
         const output = outputParts.filter(Boolean).join(" ");
