@@ -34,12 +34,110 @@ if (!MAILING_LIST || !EMAIL || !EMAIL_APP_PASS || !PASSWORD) {
 }
 
 const mailingList = MAILING_LIST.split(",");
+const SUBDOMAINS = ["toulousepadelclub", "toppadel"];
 
 /**
  * @param {number} ms
  * @returns
  */
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Login and scrape tournaments for a given subdomain
+ * @param {import("puppeteer-core").Page} page
+ * @param {string} subdomain
+ * @returns {Promise<{stripped: string, full: string, subdomain: string}[]>}
+ */
+async function scrapeTournaments(page, subdomain) {
+  const baseUrl = `https://${subdomain}.gestion-sports.com`;
+
+  try {
+    await page.goto(baseUrl);
+    console.log(`[${subdomain}] Go to login page`);
+
+    await page.type("input[type=text][name=email]", EMAIL);
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Enter");
+    await wait(2000);
+    await page.keyboard.press("Tab");
+    await page.keyboard.type(PASSWORD);
+    await page.$$eval("button", (buttons) => {
+      buttons
+        .filter((button) =>
+          button.innerText.toLowerCase().includes("connecter")
+        )[0]
+        .click();
+    });
+    await page.waitForNavigation({
+      waitUntil: "networkidle0",
+      timeout: 10000,
+    });
+    console.log(`[${subdomain}] Login done`);
+  } catch (error) {
+    console.error(`[${subdomain}] Login failed:`, error);
+    throw new Error(`Login failed for ${subdomain}`);
+  }
+
+  // Close welcome popup
+  try {
+    console.log(`[${subdomain}] Close welcome popup`);
+    const closePopupButton = await page.waitForSelector(
+      "app-welcome-popup button"
+    );
+    await closePopupButton.click();
+  } catch (error) {
+    console.error(`[${subdomain}] Could not close welcome popup`, error);
+    throw new Error(`Failed to close welcome popup for ${subdomain}`);
+  }
+
+  // Evenements page navigation
+  try {
+    console.log(`[${subdomain}] Go to reservation page`);
+    await page.goto(`${baseUrl}/appli/Évènements`);
+  } catch (error) {
+    console.error(`[${subdomain}] Navigation failed:`, error);
+    throw new Error(`Failed to navigate for ${subdomain}`);
+  }
+
+  await page.waitForSelector("app-evenements .w-100.contain app-input-search");
+  const tournoisDivs = await page.$$(
+    "app-evenements .w-100.contain app-input-search ~ div.mb-20"
+  );
+
+  const tournoisFull = await Promise.all(
+    tournoisDivs.map(async (tournoiDiv) => {
+      try {
+        const tournoiInfo = await tournoiDiv.evaluate(
+          (node) => /** @type {HTMLElement} */ (node).innerText
+        );
+        const tournoiInfoProcessed = tournoiInfo.replace(/\n/g, " ");
+        const slotsSectionMatch = tournoiInfoProcessed.match(
+          /\d{2}h\d{2}\s*-\s*\d{2}h\d{2}\s+(.+?)(?:\s+Je m'inscris)?$/i
+        );
+        const slotsSection = slotsSectionMatch ? slotsSectionMatch[1] : "";
+        const firstNumberMatch = slotsSection.match(/^(\d+)/);
+        const isFull = firstNumberMatch && firstNumberMatch[1] === "0";
+
+        const tournoiWithoutSlots = tournoiInfoProcessed
+          .replace(/(\d{2}h\d{2})\s+.+?(?:\s+Je m'inscris)?$/i, "$1")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        return {
+          stripped: `${tournoiWithoutSlots}${isFull ? "_complet" : ""}`,
+          full: tournoiInfoProcessed,
+          subdomain,
+        };
+      } catch (error) {
+        console.error(`[${subdomain}] Error parsing tournament:`, error);
+        return null;
+      }
+    })
+  ).then((results) => results.filter(Boolean));
+
+  console.log(`[${subdomain}] Found ${tournoisFull.length} tournaments`);
+  return tournoisFull;
+}
 
 export const handler = async () => {
   console.log("Handler started");
@@ -73,107 +171,34 @@ export const handler = async () => {
      */
     const page = await browser.newPage();
 
-    // Login
-    try {
-      await page.goto("https://toulousepadelclub.gestion-sports.com");
-      console.log("Go to login page");
-
-      await page.type("input[type=text][name=email]", EMAIL);
-      await page.keyboard.press("Tab");
-      await page.keyboard.press("Enter");
-      await wait(2000);
-      await page.keyboard.press("Tab");
-      await page.keyboard.type(PASSWORD);
-      await page.$$eval("button", (buttons) => {
-        buttons
-          .filter((button) =>
-            button.innerText.toLowerCase().includes("connecter")
-          )[0]
-          .click();
-      });
-      // This is needed for the next operation to not timeout
-      await page.waitForNavigation({
-        waitUntil: "networkidle0",
-        timeout: 10000,
-      });
-      console.log("Login done");
-    } catch (error) {
-      console.error("Login failed:", error);
-      throw new Error("Login process failed");
+    // Scrape tournaments from all subdomains
+    const allTournoisFull = [];
+    for (const subdomain of SUBDOMAINS) {
+      try {
+        const tournoisFull = await scrapeTournaments(page, subdomain);
+        allTournoisFull.push(...tournoisFull);
+      } catch (error) {
+        console.error(`Failed to scrape ${subdomain}:`, error);
+        throw error;
+      }
     }
-
-    // Close welcome popup
-    try {
-      console.log("Close welcome popup");
-      const closePopupButton = await page.waitForSelector(
-        "app-welcome-popup button"
-      );
-      await closePopupButton.click();
-    } catch (error) {
-      console.error("Could not close welcome popup", error);
-      throw new Error("Failed to close welcome popup");
-    }
-
-    // Evenements page navigation
-    try {
-      console.log("Go to reservation page");
-      await page.goto(
-        "https://toulousepadelclub.gestion-sports.com/appli/Évènements"
-      );
-    } catch (error) {
-      console.error("Navigation to evenements page failed:", error);
-      throw new Error("Failed to navigate to evenements page");
-    }
-
-    await page.waitForSelector(
-      "app-evenements .w-100.contain app-input-search"
-    );
-    const tournoisDivs = await page.$$(
-      "app-evenements .w-100.contain app-input-search ~ div.mb-20"
-    );
-
-    const tournoisFull = await Promise.all(
-      tournoisDivs.map(async (tournoiDiv) => {
-        try {
-          const tournoiInfo = await tournoiDiv.evaluate(
-            (node) => /** @type {HTMLElement} */ (node).innerText
-          );
-          const tournoiInfoProcessed = tournoiInfo.replace(/\n/g, " ");
-          // Full if 0 slots available - extract slot count section and check first number
-          // Match after the time range (e.g., "21h00 - 23h30" or "07h50 - 12h00")
-          const slotsSectionMatch = tournoiInfoProcessed.match(
-            /\d{2}h\d{2}\s*-\s*\d{2}h\d{2}\s+(.+?)(?:\s+Je m'inscris)?$/i
-          );
-          const slotsSection = slotsSectionMatch ? slotsSectionMatch[1] : "";
-          const firstNumberMatch = slotsSection.match(/^(\d+)/);
-          const isFull = firstNumberMatch && firstNumberMatch[1] === "0";
-
-          // Remove slot counts between the time and "Je m'inscris" or end of string
-          const tournoiWithoutSlots = tournoiInfoProcessed
-            .replace(/(\d{2}h\d{2})\s+.+?(?:\s+Je m'inscris)?$/i, "$1")
-            .replace(/\s+/g, " ")
-            .trim();
-
-          return {
-            stripped: `${tournoiWithoutSlots}${isFull ? "_complet" : ""}`,
-            full: tournoiInfoProcessed,
-          };
-        } catch (error) {
-          console.error("Error parsing tournament data:", error);
-          return null;
-        }
-      })
-    ).then((results) => results.filter(Boolean)); // Filter out nulls
 
     // Create a map from stripped to full for later lookup
     const fullTournoisMap = new Map(
-      tournoisFull.map((t) => [t.stripped, t.full])
+      allTournoisFull.map((t) => [t.stripped, t.full])
     );
-    const tournois = tournoisFull.map((t) => t.stripped);
-    console.log("tournois", tournois);
+
+    // Organize tournaments by subdomain
+    const tournoisBySubdomain = {};
+    for (const subdomain of SUBDOMAINS) {
+      tournoisBySubdomain[subdomain] = allTournoisFull
+        .filter((t) => t.subdomain === subdomain)
+        .map((t) => t.stripped);
+    }
+    console.log("tournoisBySubdomain", tournoisBySubdomain);
 
     try {
-      const serializedTournoisId = JSON.stringify(tournois);
+      const serializedTournoisId = JSON.stringify(tournoisBySubdomain);
 
       const dynamoDbClient = new DynamoDBClient({
         region: process.env.AWS_REGION,
@@ -221,25 +246,38 @@ export const handler = async () => {
       const latestTournaments = JSON.parse(serializedLatestTournamentsId);
       console.log("latestTournamentsArray", latestTournaments);
 
-      const newTournaments = tournois
-        .filter((tournoi) => !latestTournaments.includes(tournoi))
-        .filter((tournoi) => !tournoi.endsWith("_complet")) // Filter out full tournaments
-        .filter((tournoi) => !tournoi.toLowerCase().includes("femme"))
-        .filter((tournoi) => !tournoi.toLowerCase().includes("mixte"))
-        .filter((tournoi) => !tournoi.toLowerCase().includes("+45"))
-        .filter((tournoi) =>
-          ["p50", "p100", "p250"]
-            .map((level) => `${level} `)
-            .some((level) => tournoi.toLowerCase().includes(level))
-        )
-        .map((tournoi) => {
-          // notify if tournoi was previously full but now has spots
-          if (latestTournaments.includes(`${tournoi}_complet`)) {
-            return `Places libérées : ${tournoi}`;
-          }
-          return tournoi;
-        });
-      console.log("newTournaments", newTournaments);
+      // Process new tournaments per subdomain
+      const newTournamentsBySubdomain = {};
+      for (const subdomain of SUBDOMAINS) {
+        const currentTournaments = tournoisBySubdomain[subdomain] || [];
+        const latestTournamentsList = latestTournaments[subdomain] || [];
+
+        const newTournaments = currentTournaments
+          .filter((tournoi) => !latestTournamentsList.includes(tournoi))
+          .filter((tournoi) => !tournoi.endsWith("_complet"))
+          .filter((tournoi) => !tournoi.toLowerCase().includes("femme"))
+          .filter((tournoi) => !tournoi.toLowerCase().includes("mixte"))
+          .filter((tournoi) => !tournoi.toLowerCase().includes("+45"))
+          .filter((tournoi) =>
+            ["p50", "p100", "p250"]
+              .map((level) => `${level} `)
+              .some((level) => tournoi.toLowerCase().includes(level))
+          )
+          .map((tournoi) => {
+            // notify if tournoi was previously full but now has spots
+            if (latestTournamentsList.includes(`${tournoi}_complet`)) {
+              return `Places libérées : ${tournoi}`;
+            }
+            return tournoi;
+          });
+
+        if (newTournaments.length > 0) {
+          newTournamentsBySubdomain[subdomain] = newTournaments;
+        }
+      }
+      console.log("newTournamentsBySubdomain", newTournamentsBySubdomain);
+
+      const newTournaments = Object.values(newTournamentsBySubdomain).flat();
 
       if (newTournaments.length === 0) {
         console.log("No new tournaments after filtering");
@@ -269,79 +307,88 @@ export const handler = async () => {
         "sam.": "<b>samedi</b>",
         "dim.": "dimanche",
       };
+
+      const formatTournament = (data) => {
+        // Extract prefix if present (e.g., "Places libérées : ")
+        const prefixMatch = data.match(/^Places libérées\s*:\s*/i);
+        const prefix = prefixMatch ? "Places libérées: " : "";
+        const cleanData = data.replace(/^Places libérées\s*:\s*/i, "");
+
+        // Extract level (P50, P100, P250)
+        const levelMatch = cleanData.match(/(P\d+)/i);
+        const level = levelMatch ? levelMatch[1] : "";
+
+        // Extract nocturne
+        const nocturneMatchedFromText = cleanData.match(/nocturne/i);
+
+        // Extract remaining slots from the full tournament data
+        const fullTournamentData = fullTournoisMap.get(cleanData) || "";
+        const spotsMatch = fullTournamentData.match(
+          /\d{2}h\d{2}\s+(.+?)(?:\s+Je m'inscris)?$/i
+        );
+        const spots = spotsMatch ? spotsMatch[1].trim() : "";
+
+        // Extract date and time
+        let processedDateTime = "";
+        const dateMatch = cleanData.match(
+          /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
+        );
+        if (dateMatch) {
+          const [_fullMatch, dayAbbrev, dayNum, monthAbbrev, hour, min] =
+            dateMatch;
+          const dayLower = dayAbbrev.toLowerCase();
+          const day = dayAbbrevMap[dayLower] || dayLower;
+
+          let timeStr = `${hour}h${min}`;
+
+          const timeEndMatch = cleanData.match(
+            /(\d{2})h(\d{2})\s*-\s*(\d{2})h(\d{2})/
+          );
+          if (timeEndMatch) {
+            const [, , , endHour, endMin] = timeEndMatch;
+            timeStr = `${hour}h${min}-${endHour}h${endMin}`;
+          }
+
+          processedDateTime = `${day} ${dayNum} ${monthAbbrev} ${timeStr}`;
+        }
+
+        // Check if nocturnal
+        const isNocturnal =
+          (cleanData.match(/(\d{2})h\d{2}/) &&
+            parseInt(cleanData.match(/(\d{2})h\d{2}/)[1]) >= 18) ||
+          cleanData.toLowerCase().includes("nocturne");
+
+        // Build final output
+        let outputParts = [];
+        if (isNocturnal || nocturneMatchedFromText) {
+          outputParts.push(`<b>nocturne</b>`);
+        }
+        outputParts.push(processedDateTime, level);
+        outputParts.push(spots);
+
+        const output = outputParts.filter(Boolean).join(" ");
+        return prefix + output;
+      };
+
       const mailOptions = {
         from: "izi.rutabaga@gmail.com",
         to: mailingList.join(", "),
         subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
         html: `
-       ${newTournaments
-         .map(
-           (data) =>
-             `<p style="font-size:1rem;line-height:1.5rem">${(() => {
-               // Extract prefix if present (e.g., "Places libérées : ")
-               const prefixMatch = data.match(/^Places libérées\s*:\s*/i);
-               const prefix = prefixMatch ? "Places libérées: " : "";
-               const cleanData = data.replace(/^Places libérées\s*:\s*/i, "");
-
-               // Extract level (P50, P100, P250)
-               const levelMatch = cleanData.match(/(P\d+)/i);
-               const level = levelMatch ? levelMatch[1] : "";
-
-               // Extract nocturne
-               const nocturneMatchedFromText = cleanData.match(/nocturne/i);
-
-               // Extract remaining slots from the full tournament data
-               // Match everything between the time (HHhMM) and either "Je m'inscris" or end of string
-               const fullTournamentData = fullTournoisMap.get(cleanData) || "";
-               const spotsMatch = fullTournamentData.match(
-                 /\d{2}h\d{2}\s+(.+?)(?:\s+Je m'inscris)?$/i
-               );
-               const spots = spotsMatch ? spotsMatch[1].trim() : "";
-
-               // Extract date and time (format: "Day. DD Month.  HHhMM - HHhMM")
-               let processedDateTime = "";
-               const dateMatch = cleanData.match(
-                 /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
-               );
-               if (dateMatch) {
-                 const [_fullMatch, dayAbbrev, dayNum, monthAbbrev, hour, min] =
-                   dateMatch;
-                 const dayLower = dayAbbrev.toLowerCase();
-                 const day = dayAbbrevMap[dayLower] || dayLower;
-
-                 let timeStr = `${hour}h${min}`;
-
-                 // Extract end time if present (format: " - HHhMM")
-                 const timeEndMatch = cleanData.match(
-                   /(\d{2})h(\d{2})\s*-\s*(\d{2})h(\d{2})/
-                 );
-                 if (timeEndMatch) {
-                   const [, , , endHour, endMin] = timeEndMatch;
-                   timeStr = `${hour}h${min}-${endHour}h${endMin}`;
-                 }
-
-                 processedDateTime = `${day} ${dayNum} ${monthAbbrev} ${timeStr}`;
-               }
-
-               // Check if nocturnal
-               const isNocturnal =
-                 (cleanData.match(/(\d{2})h\d{2}/) &&
-                   parseInt(cleanData.match(/(\d{2})h\d{2}/)[1]) >= 18) ||
-                 cleanData.toLowerCase().includes("nocturne");
-
-               // Build final output
-               let outputParts = [];
-               if (isNocturnal || nocturneMatchedFromText) {
-                 outputParts.push(`<b>nocturne</b>`);
-               }
-               outputParts.push(processedDateTime, level);
-               outputParts.push(spots);
-
-               const output = outputParts.filter(Boolean).join(" ");
-               return prefix + output;
-             })()}</p>`
-         )
-         .join("")}
+        ${Object.entries(newTournamentsBySubdomain)
+          .map(
+            ([subdomain, tournaments]) =>
+              `<h2>${subdomain}</h2>
+              ${tournaments
+                .map(
+                  (data) =>
+                    `<p style="font-size:1rem;line-height:1.5rem">${formatTournament(
+                      data
+                    )}</p>`
+                )
+                .join("")}`
+          )
+          .join("<hr />")}
         `,
       };
       const sentMessageInfo = await transporter.sendMail(mailOptions);
