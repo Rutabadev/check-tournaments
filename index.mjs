@@ -34,7 +34,7 @@ if (!MAILING_LIST || !EMAIL || !EMAIL_APP_PASS || !PASSWORD) {
 }
 
 const mailingList = MAILING_LIST.split(",");
-const SUBDOMAINS = ["toulousepadelclub", "toppadel"];
+const SUBDOMAINS = ["toulousepadelclub", "toppadel", "acepadelclub"];
 
 /**
  * @param {number} ms
