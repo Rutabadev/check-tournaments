@@ -199,16 +199,22 @@ export const handler = async () => {
       });
     }
     // Scrape tournaments from all subdomains in parallel
-    const tournoisResults = await Promise.all(
+    const tournoisResults = await Promise.allSettled(
       SUBDOMAINS.map((subdomain) =>
-        scrapeTournaments(browser, subdomain).catch((error) => {
-          console.error(`Failed to scrape ${subdomain}:`, error);
-          throw error;
-        })
+        scrapeTournaments(browser, subdomain)
       )
     );
 
-    const allTournoisFull = tournoisResults.flat();
+    const allTournoisFull = tournoisResults
+      .filter((result) => {
+        if (result.status === "rejected") {
+          console.error(`Failed to scrape subdomain:`, result.reason);
+          return false;
+        }
+        return true;
+      })
+      .map((result) => result.value)
+      .flat();
 
     // Create a map from stripped to full for later lookup
     const fullTournoisMap = new Map(
