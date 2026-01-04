@@ -284,7 +284,10 @@ export const handler = async () => {
           .filter((tournoi) => !tournoi.endsWith("_complet"))
           .filter((tournoi) => !tournoi.toLowerCase().includes("femme"))
           .filter((tournoi) => !tournoi.toLowerCase().includes("mixte"))
-          .filter((tournoi) => !tournoi.toLowerCase().includes("+45"))
+          .filter((tournoi) => !tournoi.toLowerCase().match(/\+\s*45/))
+          .filter(
+            (tournoi) => !tournoi.toLowerCase().includes("liste d'attente")
+          )
           .filter((tournoi) =>
             ["p50", "p100", "p250"]
               .map((level) => `${level} `)
