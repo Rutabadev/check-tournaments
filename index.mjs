@@ -48,7 +48,7 @@ const SUBDOMAINS = [
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Login and scrape tournaments for a given subdomain
+ * Scrape tournaments for a given subdomain
  * @param {import("puppeteer-core").Browser} browser
  * @param {string} subdomain
  * @returns {Promise<{stripped: string, full: string, subdomain: string}[]>}
@@ -171,6 +171,77 @@ async function scrapeTournaments(browser, subdomain) {
   return tournoisFull;
 }
 
+/**
+ * Process tournaments for a subdomain: scrape, fetch DB, compare, filter
+ * @param {import("puppeteer-core").Browser} browser
+ * @param {string} subdomain
+ * @param {DynamoDBClient} dynamoDbClient
+ * @returns {Promise<{subdomain: string, newTournaments: string[], currentTournaments: string[], needsDbUpdate: boolean}>}
+ */
+async function processTournament(browser, subdomain, dynamoDbClient) {
+  // Scrape tournaments
+  const tournoisFull = await scrapeTournaments(browser, subdomain);
+  const currentTournaments = tournoisFull.map((t) => t.stripped);
+
+  // Fetch latest from DB
+  let latestTournaments = [];
+  try {
+    const { Items } = await dynamoDbClient.send(
+      new QueryCommand({
+        TableName: "tournaments",
+        KeyConditionExpression: "id = :id",
+        ExpressionAttributeValues: {
+          ":id": { S: `latest-${subdomain}` },
+        },
+      })
+    );
+    latestTournaments = JSON.parse(Items?.[0]?.tournaments?.S || "[]");
+  } catch (error) {
+    console.log(
+      `[${subdomain}] No previous tournaments in DB (first run or error):`,
+      error.message
+    );
+  }
+
+  // Create map from stripped to full for email formatting
+  const fullTournoisMap = new Map(
+    tournoisFull.map((t) => [t.stripped, t.full])
+  );
+
+  // Filter new tournaments
+  const newTournaments = currentTournaments
+    .filter((tournoi) => !latestTournaments.includes(tournoi))
+    .filter((tournoi) => !tournoi.endsWith("_complet"))
+    .filter((tournoi) => !tournoi.toLowerCase().includes("femme"))
+    .filter((tournoi) => !tournoi.toLowerCase().includes("mixte"))
+    .filter((tournoi) => !tournoi.toLowerCase().match(/\+\s*45/))
+    .filter((tournoi) => !tournoi.toLowerCase().includes("liste d'attente"))
+    .filter((tournoi) =>
+      ["p50", "p100", "p250"]
+        .map((level) => `${level} `)
+        .some((level) => tournoi.toLowerCase().includes(level))
+    )
+    .map((tournoi) => {
+      // Notify if tournoi was previously full but now has spots
+      if (latestTournaments.includes(`${tournoi}_complet`)) {
+        return `Places libérées : ${tournoi}`;
+      }
+      return tournoi;
+    });
+
+  // Check if DB update needed
+  const needsDbUpdate =
+    JSON.stringify(currentTournaments) !== JSON.stringify(latestTournaments);
+
+  return {
+    subdomain,
+    newTournaments,
+    currentTournaments,
+    needsDbUpdate,
+    fullTournoisMap,
+  };
+}
+
 export const handler = async () => {
   console.log("Handler started");
   let browser;
@@ -198,222 +269,184 @@ export const handler = async () => {
         ignoreHTTPSErrors: true,
       });
     }
-    // Scrape tournaments from all subdomains in parallel
-    const tournoisResults = await Promise.allSettled(
+    // Initialize DynamoDB client
+    const dynamoDbClient = new DynamoDBClient({
+      region: process.env.AWS_REGION,
+      ...((isLocal || !isProduction) && {
+        credentials: {
+          accessKeyId: process.env.ACCESS_KEY_ID,
+          secretAccessKey: process.env.SECRET_ACCESS_KEY,
+        },
+      }),
+    });
+
+    // Process all subdomains in parallel
+    const processResults = await Promise.allSettled(
       SUBDOMAINS.map((subdomain) =>
-        scrapeTournaments(browser, subdomain)
+        processTournament(browser, subdomain, dynamoDbClient)
       )
     );
 
-    const allTournoisFull = tournoisResults
-      .filter((result) => {
-        if (result.status === "rejected") {
-          console.error(`Failed to scrape subdomain:`, result.reason);
-          return false;
-        }
-        return true;
-      })
-      .map((result) => result.value)
-      .flat();
+    // Collect results
+    const newTournamentsBySubdomain = {};
+    const updatesToMake = [];
+    const fullTournoisMaps = {};
 
-    // Create a map from stripped to full for later lookup
-    const fullTournoisMap = new Map(
-      allTournoisFull.map((t) => [t.stripped, t.full])
+    for (const result of processResults) {
+      if (result.status === "rejected") {
+        console.error(`Failed to process subdomain:`, result.reason);
+        continue;
+      }
+
+      const {
+        subdomain,
+        newTournaments,
+        currentTournaments,
+        needsDbUpdate,
+        fullTournoisMap,
+      } = result.value;
+
+      if (newTournaments.length > 0) {
+        newTournamentsBySubdomain[subdomain] = newTournaments;
+      }
+
+      if (needsDbUpdate) {
+        updatesToMake.push({
+          subdomain,
+          tournaments: currentTournaments,
+        });
+      }
+
+      fullTournoisMaps[subdomain] = fullTournoisMap;
+    }
+
+    console.log("newTournamentsBySubdomain", newTournamentsBySubdomain);
+
+    const newTournaments = Object.values(newTournamentsBySubdomain).flat();
+
+    if (newTournaments.length === 0) {
+      console.log("No new tournaments after filtering");
+      // Still update DB for successful subdomains with changes
+      if (!process.env.DEBUG && updatesToMake.length > 0) {
+        console.log(
+          `Updating DB for ${updatesToMake.length} subdomain(s) with tournament changes`
+        );
+        for (const update of updatesToMake) {
+          await dynamoDbClient.send(
+            new PutItemCommand({
+              TableName: "tournaments",
+              Item: {
+                id: { S: `latest-${update.subdomain}` },
+                tournaments: { S: JSON.stringify(update.tournaments) },
+              },
+            })
+          );
+          console.log(`[${update.subdomain}] DB updated`);
+        }
+      }
+      return {
+        statusCode: 200,
+        body: JSON.stringify("No new tournaments"),
+      };
+    }
+
+    const onlyFreedSpots = newTournaments.every((tournoi) =>
+      tournoi.toLowerCase().includes("places libérées")
     );
 
-    // Organize tournaments by subdomain
-    const tournoisBySubdomain = {};
-    for (const subdomain of SUBDOMAINS) {
-      tournoisBySubdomain[subdomain] = allTournoisFull
-        .filter((t) => t.subdomain === subdomain)
-        .map((t) => t.stripped);
-    }
-    console.log("tournoisBySubdomain", tournoisBySubdomain);
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "izi.rutabaga@gmail.com",
+        pass: EMAIL_APP_PASS, // app-specific password since 2FA is enabled
+      },
+    });
+    const dayAbbrevMap = {
+      "lun.": "lundi",
+      "mar.": "mardi",
+      "mer.": "mercredi",
+      "jeu.": "jeudi",
+      "ven.": "vendredi",
+      "sam.": "<b>samedi</b>",
+      "dim.": "dimanche",
+    };
 
-    try {
-      const serializedTournoisId = JSON.stringify(tournoisBySubdomain);
+    /**
+     * Format a tournament for email display
+     * @param {string} data - Tournament string
+     * @param {Map} fullTournoisMap - Map from stripped to full tournament data
+     * @returns {string} Formatted tournament HTML
+     */
+    const formatTournament = (data, fullTournoisMap) => {
+      // Extract prefix if present (e.g., "Places libérées : ")
+      const prefixMatch = data.match(/^Places libérées\s*:\s*/i);
+      const prefix = prefixMatch ? "Places libérées: " : "";
+      const cleanData = data.replace(/^Places libérées\s*:\s*/i, "");
 
-      const dynamoDbClient = new DynamoDBClient({
-        region: process.env.AWS_REGION,
-        ...((isLocal || !isProduction) && {
-          credentials: {
-            accessKeyId: process.env.ACCESS_KEY_ID,
-            secretAccessKey: process.env.SECRET_ACCESS_KEY,
-          },
-        }),
-      });
+      // Extract level (P50, P100, P250)
+      const levelMatch = cleanData.match(/(P\d+)/i);
+      const level = levelMatch ? levelMatch[1] : "";
 
-      const { Items } = await dynamoDbClient.send(
-        new QueryCommand({
-          TableName: "tournaments",
-          KeyConditionExpression: "id = :id",
-          ExpressionAttributeValues: {
-            ":id": { S: "latest" },
-          },
-        })
+      // Extract nocturne
+      const nocturneMatchedFromText = cleanData.match(/nocturne/i);
+
+      // Extract remaining slots from the full tournament data
+      const fullTournamentData = fullTournoisMap.get(cleanData) || "";
+      const spotsMatch = fullTournamentData.match(
+        /\d{2}h\d{2}\s+(.+?)(?:\s+Je m'inscris)?$/i
       );
+      const spots = spotsMatch ? spotsMatch[1].trim() : "";
 
-      const serializedLatestTournamentsId = Items?.[0]?.tournaments?.S || "[]";
-
-      if (serializedLatestTournamentsId === serializedTournoisId) {
-        console.log("No new tournaments from last time");
-        return {
-          statusCode: 200,
-          body: JSON.stringify("No new changes in tournaments"),
-        };
-      }
-
-      if (!process.env.DEBUG) {
-        await dynamoDbClient.send(
-          new PutItemCommand({
-            TableName: "tournaments",
-            Item: {
-              id: { S: "latest" },
-              tournaments: { S: serializedTournoisId },
-            },
-          })
-        );
-        console.log("updated db");
-      }
-
-      const latestTournaments = JSON.parse(serializedLatestTournamentsId);
-      console.log("latestTournamentsArray", latestTournaments);
-
-      // Process new tournaments per subdomain
-      const newTournamentsBySubdomain = {};
-      for (const subdomain of SUBDOMAINS) {
-        const currentTournaments = tournoisBySubdomain[subdomain] || [];
-        const latestTournamentsList = latestTournaments[subdomain] || [];
-
-        const newTournaments = currentTournaments
-          .filter((tournoi) => !latestTournamentsList.includes(tournoi))
-          .filter((tournoi) => !tournoi.endsWith("_complet"))
-          .filter((tournoi) => !tournoi.toLowerCase().includes("femme"))
-          .filter((tournoi) => !tournoi.toLowerCase().includes("mixte"))
-          .filter((tournoi) => !tournoi.toLowerCase().match(/\+\s*45/))
-          .filter(
-            (tournoi) => !tournoi.toLowerCase().includes("liste d'attente")
-          )
-          .filter((tournoi) =>
-            ["p50", "p100", "p250"]
-              .map((level) => `${level} `)
-              .some((level) => tournoi.toLowerCase().includes(level))
-          )
-          .map((tournoi) => {
-            // notify if tournoi was previously full but now has spots
-            if (latestTournamentsList.includes(`${tournoi}_complet`)) {
-              return `Places libérées : ${tournoi}`;
-            }
-            return tournoi;
-          });
-
-        if (newTournaments.length > 0) {
-          newTournamentsBySubdomain[subdomain] = newTournaments;
-        }
-      }
-      console.log("newTournamentsBySubdomain", newTournamentsBySubdomain);
-
-      const newTournaments = Object.values(newTournamentsBySubdomain).flat();
-
-      if (newTournaments.length === 0) {
-        console.log("No new tournaments after filtering");
-        return {
-          statusCode: 200,
-          body: JSON.stringify("No new tournaments"),
-        };
-      }
-
-      const onlyFreedSpots = newTournaments.every((tournoi) =>
-        tournoi.toLowerCase().includes("places libérées")
+      // Extract date and time
+      let processedDate = "";
+      let timeStr = "";
+      const dateMatch = cleanData.match(
+        /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
       );
+      if (dateMatch) {
+        const [_fullMatch, dayAbbrev, dayNum, monthAbbrev, hour, min] =
+          dateMatch;
+        const dayLower = dayAbbrev.toLowerCase();
+        const day = dayAbbrevMap[dayLower] || dayLower;
 
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: "izi.rutabaga@gmail.com",
-          pass: EMAIL_APP_PASS, // app-specific password since 2FA is enabled
-        },
-      });
-      const dayAbbrevMap = {
-        "lun.": "lundi",
-        "mar.": "mardi",
-        "mer.": "mercredi",
-        "jeu.": "jeudi",
-        "ven.": "vendredi",
-        "sam.": "<b>samedi</b>",
-        "dim.": "dimanche",
-      };
+        timeStr = `${hour}h${min}`;
 
-      const formatTournament = (data) => {
-        // Extract prefix if present (e.g., "Places libérées : ")
-        const prefixMatch = data.match(/^Places libérées\s*:\s*/i);
-        const prefix = prefixMatch ? "Places libérées: " : "";
-        const cleanData = data.replace(/^Places libérées\s*:\s*/i, "");
-
-        // Extract level (P50, P100, P250)
-        const levelMatch = cleanData.match(/(P\d+)/i);
-        const level = levelMatch ? levelMatch[1] : "";
-
-        // Extract nocturne
-        const nocturneMatchedFromText = cleanData.match(/nocturne/i);
-
-        // Extract remaining slots from the full tournament data
-        const fullTournamentData = fullTournoisMap.get(cleanData) || "";
-        const spotsMatch = fullTournamentData.match(
-          /\d{2}h\d{2}\s+(.+?)(?:\s+Je m'inscris)?$/i
+        const timeEndMatch = cleanData.match(
+          /(\d{2})h(\d{2})\s*-\s*(\d{2})h(\d{2})/
         );
-        const spots = spotsMatch ? spotsMatch[1].trim() : "";
-
-        // Extract date and time
-        let processedDate = "";
-        let timeStr = "";
-        const dateMatch = cleanData.match(
-          /([A-Za-zÀ-ÿ]{3}\.)\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,4}\.)\s+(\d{2})h(\d{2})/i
-        );
-        if (dateMatch) {
-          const [_fullMatch, dayAbbrev, dayNum, monthAbbrev, hour, min] =
-            dateMatch;
-          const dayLower = dayAbbrev.toLowerCase();
-          const day = dayAbbrevMap[dayLower] || dayLower;
-
-          timeStr = `${hour}h${min}`;
-
-          const timeEndMatch = cleanData.match(
-            /(\d{2})h(\d{2})\s*-\s*(\d{2})h(\d{2})/
-          );
-          if (timeEndMatch) {
-            const [, , , endHour, endMin] = timeEndMatch;
-            timeStr = `${hour}h${min}-${endHour}h${endMin}`;
-          }
-
-          processedDate = `${day} ${dayNum} ${monthAbbrev}`;
+        if (timeEndMatch) {
+          const [, , , endHour, endMin] = timeEndMatch;
+          timeStr = `${hour}h${min}-${endHour}h${endMin}`;
         }
 
-        // Check if nocturnal
-        const isNocturnal =
-          (cleanData.match(/(\d{2})h\d{2}/) &&
-            parseInt(cleanData.match(/(\d{2})h\d{2}/)[1]) >= 18) ||
-          cleanData.toLowerCase().includes("nocturne");
+        processedDate = `${day} ${dayNum} ${monthAbbrev}`;
+      }
 
-        // Build final output
-        let outputParts = [];
-        if (isNocturnal || nocturneMatchedFromText) {
-          outputParts.push(`<b>nocturne</b>`);
-        }
-        outputParts.push(processedDate);
-        outputParts.push(level);
-        outputParts.push(timeStr);
-        outputParts.push(spots);
+      // Check if nocturnal
+      const isNocturnal =
+        (cleanData.match(/(\d{2})h\d{2}/) &&
+          parseInt(cleanData.match(/(\d{2})h\d{2}/)[1]) >= 18) ||
+        cleanData.toLowerCase().includes("nocturne");
 
-        const output = outputParts.filter(Boolean).join(" ");
-        return prefix + output;
-      };
+      // Build final output
+      let outputParts = [];
+      if (isNocturnal || nocturneMatchedFromText) {
+        outputParts.push(`<b>nocturne</b>`);
+      }
+      outputParts.push(processedDate);
+      outputParts.push(level);
+      outputParts.push(timeStr);
+      outputParts.push(spots);
 
-      const mailOptions = {
-        from: "izi.rutabaga@gmail.com",
-        to: mailingList.join(", "),
-        subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
-        html: `
+      const output = outputParts.filter(Boolean).join(" ");
+      return prefix + output;
+    };
+
+    const mailOptions = {
+      from: "izi.rutabaga@gmail.com",
+      to: mailingList.join(", "),
+      subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
+      html: `
         ${Object.entries(newTournamentsBySubdomain)
           .map(
             ([subdomain, tournaments]) =>
@@ -422,19 +455,35 @@ export const handler = async () => {
                 .map(
                   (data) =>
                     `<p style="font-size:1rem;line-height:1.5rem">${formatTournament(
-                      data
+                      data,
+                      fullTournoisMaps[subdomain]
                     )}</p>`
                 )
                 .join("")}`
           )
           .join("<hr />")}
         `,
-      };
-      const sentMessageInfo = await transporter.sendMail(mailOptions);
-      console.log("Email sent:", sentMessageInfo);
-    } catch (error) {
-      console.error("Tournament processing failed:", error);
-      throw new Error("Failed to process tournaments");
+    };
+    const sentMessageInfo = await transporter.sendMail(mailOptions);
+    console.log("Email sent:", sentMessageInfo);
+
+    // Update DB for all successful subdomains after email sent
+    if (!process.env.DEBUG) {
+      console.log(
+        `Updating DB for ${updatesToMake.length} subdomain(s) with tournament changes`
+      );
+      for (const update of updatesToMake) {
+        await dynamoDbClient.send(
+          new PutItemCommand({
+            TableName: "tournaments",
+            Item: {
+              id: { S: `latest-${update.subdomain}` },
+              tournaments: { S: JSON.stringify(update.tournaments) },
+            },
+          })
+        );
+        console.log(`[${update.subdomain}] DB updated`);
+      }
     }
   } catch (error) {
     console.error("Handler error:", error);

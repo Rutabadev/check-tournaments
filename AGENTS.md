@@ -2,22 +2,27 @@
 
 ## Project Overview
 
-A web scraping tool that monitors padel tournament availability across three club websites. Runs on AWS Lambda, scrapes tournament listings, tracks changes in DynamoDB, and sends email notifications when new tournaments matching specific criteria are available.
+A web scraping tool that monitors padel tournament availability across four club websites. Runs on AWS Lambda, scrapes tournament listings, tracks changes in DynamoDB, and sends email notifications when new tournaments matching specific criteria are available.
 
 ## Architecture
 
 ```
-Puppeteer (headless browser automation)
+Handler launches browser
   ↓
-Login to gestion-sports.com subdomains
+processTournament runs in parallel for each subdomain
+  ├─ Login to gestion-sports.com
+  ├─ Scrape tournament listings (HTML parsing)
+  ├─ Fetch previous state from DynamoDB (per-subdomain key)
+  ├─ Compare and filter tournaments
+  └─ Return {newTournaments, currentTournaments, needsDbUpdate, fullTournoisMap}
   ↓
-Scrape tournament listings (HTML parsing)
+Collect results (failed subdomains skipped, others aggregated)
   ↓
-Compare with previous state (DynamoDB)
+Send email (if any new tournaments after filtering)
   ↓
-Apply filters (level, gender, time category)
+Update DynamoDB for successful subdomains with changes
   ↓
-Send email notifications
+Close browser and return
 ```
 
 ## Key Files
@@ -32,12 +37,13 @@ Send email notifications
 
 ### Subdomains Being Monitored
 
-Three padel club subdomains are scraped:
+Four padel club subdomains are scraped:
 - `toulousepadelclub.gestion-sports.com`
 - `toppadel.gestion-sports.com`
 - `acepadelclub.gestion-sports.com`
+- `the-country-club-toulouse.gestion-sports.com`
 
-These are hardcoded in the `SUBDOMAINS` array. Changes here require code modification.
+These are hardcoded in the `SUBDOMAINS` array in index.mjs. To add/remove a subdomain, edit the array and re-deploy.
 
 ### Tournament Filtering Logic
 
@@ -49,7 +55,7 @@ After scraping, tournaments are filtered by:
 
 The rationale: the user is interested in men's amateur padel tournaments at specified skill levels.
 
-If filtering rules need to change, modify the filter chain around line 276-287 in index.mjs.
+To modify filtering rules, edit the filter chain in the `processTournament` function. Each `.filter()` call is a rule—add, remove, or modify them as needed.
 
 ### Scraping Strategy
 
@@ -63,15 +69,19 @@ If filtering rules need to change, modify the filter chain around line 276-287 i
 ### State Tracking
 
 DynamoDB table `tournaments` stores:
-- **Key**: `id: "latest"`
-- **Value**: JSON string of tournaments found in last run, organized by subdomain
+- **Key**: `id: "latest-{subdomain}"` (per-subdomain tracking)
+- **Value**: JSON string of tournaments found in last run for that subdomain
 
 On each run:
-1. Fetch latest tournaments from DB
-2. Compare with current scrape
-3. Identify new tournaments (not in previous state, not full, passes filters)
-4. Update DB only if changes detected
-5. Send email if new tournaments found
+1. For each subdomain in parallel (via `processTournament`):
+   - Fetch latest tournaments from DB using `latest-{subdomain}` key
+   - Compare with current scrape
+   - Identify new tournaments (not in previous state, not full, passes filters)
+2. Collect all results (failed subdomains are skipped, successful ones aggregated)
+3. Send email if any new tournaments found across all subdomains
+4. Update DB only for subdomains with changes detected (after email is sent)
+
+**Key benefit of per-subdomain keys**: If one subdomain's scrape fails, its DB record is not updated, preserving data for the next run. Other subdomains can still update independently.
 
 ## Error Handling & Notifications
 
@@ -90,7 +100,7 @@ Keep emails simple:
 - **Body**: Clear description of what failed + relevant error message
 - Do NOT include full stack traces or irrelevant logs
 
-Example existing pattern (line 105-110): notification when welcome popup is missing.
+Example existing pattern in `scrapeTournaments`: notification when welcome popup is missing.
 
 ### Example: Adding Error Detection
 
@@ -102,7 +112,7 @@ if (tournoisDivs.length === 0) {
 }
 ```
 
-Use the existing `sendMail` pattern with nodemailer (see lines 316-322 for transport setup).
+Use the existing nodemailer transport pattern with `nodemailer.createTransport()` to send admin notifications.
 
 ## Common Tasks for Agents
 
@@ -134,7 +144,7 @@ Use the existing `sendMail` pattern with nodemailer (see lines 316-322 for trans
 
 ### Modifying Tournament Filters
 
-Edit the filter chain (lines 276-287). Example: to also include mixte tournaments:
+Edit the filter chain in the `processTournament` function. Example: to also include mixte tournaments:
 
 ```javascript
 // Remove this line:
@@ -143,7 +153,7 @@ Edit the filter chain (lines 276-287). Example: to also include mixte tournament
 
 ## Email Formatting
 
-The `formatTournament` function (lines 333-396) parses raw tournament text and formats it for email. It extracts:
+The `formatTournament` function parses raw tournament text and formats it for email. It extracts:
 - Level (P50, P100, P250)
 - Date and time
 - Available slots
@@ -196,3 +206,21 @@ DEBUG              - If set, prevents writing to DynamoDB (useful for testing)
 - JSDoc comments for function signatures
 - Error messages include `[subdomain]` prefix for clarity
 - All async operations use `await` (no floating promises)
+
+## Recent Refactorings
+
+### Jan 2026: Per-Subdomain State Tracking
+
+**Problem**: When one subdomain's scrape failed, the global DynamoDB record was overwritten with partial data, causing old tournaments to re-appear as new in subsequent runs.
+
+**Solution**: Changed from single `id: "latest"` key to per-subdomain keys (`id: "latest-{subdomain}"`). Now each subdomain maintains independent state—if one fails, others can still update their records.
+
+**Impact**: Eliminated duplicate tournament emails caused by state corruption.
+
+### Jan 2026: Parallel Processing with `processTournament`
+
+**Problem**: Code had nested loops that were hard to follow and made error handling unclear (which failures should prevent DB updates?).
+
+**Solution**: Extracted `processTournament` function that encapsulates the full workflow for one subdomain: scrape → fetch DB → filter → return results. All subdomains run in parallel via `Promise.allSettled`, then results are collected once.
+
+**Impact**: Clearer error boundaries, easier to test, failed subdomains no longer corrupt successful ones.
