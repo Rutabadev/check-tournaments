@@ -73,6 +73,7 @@ Tournaments are parsed into structured objects (see `src/scraping/parser.mjs`):
   isFull: false,           // spots === 0
   category: "homme",       // "homme", "femme", "mixte"
   ageGroup: null,          // "+45" or null
+  youthGroup: null,        // "U14", "U16", etc. or null
   isWaitlist: false,       // Contains "liste d'attente"
   rawText: "...",          // Original text for debugging
   id: "tpc-lun.10jan.-P100-18h00-20h00"  // Unique ID for DB comparison
@@ -106,6 +107,7 @@ Filters are defined in `src/filtering/rules.mjs`:
 export const isNotFull = (t) => !t.isFull;
 export const isMen = (t) => t.category === "homme";
 export const isNotSenior = (t) => t.ageGroup !== "+45";
+export const isNotYouth = (t) => t.youthGroup === null;
 export const isTargetLevel = (t) => ["P50", "P100", "P250"].includes(t.level);
 export const isNotWaitlist = (t) => !t.isWaitlist;
 ```
