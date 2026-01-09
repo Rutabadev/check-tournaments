@@ -5,7 +5,10 @@
   "main": "index.mjs",
   "type": "module",
   "scripts": {
-    "start": "NODE_ENV=local node run-local.mjs"
+    "start": "NODE_ENV=local node run-local.mjs",
+    "build": "node esbuild.config.mjs",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +21,8 @@
     "puppeteer-core": "^24.1.1"
   },
   "devDependencies": {
-    "puppeteer": "^24.1.1"
+    "esbuild": "^0.27.2",
+    "puppeteer": "^24.1.1",
+    "vitest": "^4.0.16"
   }
 }

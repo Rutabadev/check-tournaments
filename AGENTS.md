@@ -9,158 +9,149 @@ A web scraping tool that monitors padel tournament availability across four club
 ```
 Handler launches browser
   ↓
-processTournament runs in parallel for each subdomain
-  ├─ Login to gestion-sports.com
-  ├─ Scrape tournament listings (HTML parsing)
-  ├─ Fetch previous state from DynamoDB (per-subdomain key)
-  ├─ Compare and filter tournaments
-  └─ Return {newTournaments, currentTournaments, needsDbUpdate, fullTournoisMap}
+processSubdomain runs in parallel for each subdomain
+  ├─ Login to gestion-sports.com (login.mjs)
+  ├─ Scrape & parse tournaments into structured data (scraper.mjs, parser.mjs)
+  ├─ Fetch previous IDs from DynamoDB (dynamodb.mjs)
+  ├─ Filter & find new tournaments (filtering/index.mjs)
+  └─ Return {subdomain, newTournaments, tournamentIds, needsDbUpdate}
   ↓
-Collect results (failed subdomains skipped, others aggregated)
+Collect results (failed subdomains skipped)
   ↓
-Send email (if any new tournaments after filtering)
+Send email if any new tournaments (email/sender.mjs)
   ↓
-Update DynamoDB for successful subdomains with changes
+Update DynamoDB once at the end (single update path)
   ↓
 Close browser and return
 ```
 
+## Folder Structure
+
+```
+src/
+  config/
+    index.mjs           # Env vars, subdomains, constants (SUBDOMAINS, DAY_ABBREV_MAP, etc.)
+  
+  scraping/
+    browser.mjs         # Browser launch (local vs lambda)
+    login.mjs           # Login to gestion-sports
+    parser.mjs          # Parse tournament HTML into structured Tournament object
+    scraper.mjs         # Orchestrates: login → navigate → parse
+  
+  storage/
+    dynamodb.mjs        # Client init, get/put operations
+  
+  email/
+    transport.mjs       # Nodemailer setup
+    formatter.mjs       # Tournament → HTML (simple template)
+    sender.mjs          # Send tournament notifications
+    admin.mjs           # Send admin error notifications
+  
+  filtering/
+    rules.mjs           # Filter functions (isNotFull, isMen, isNotSenior, etc.)
+    index.mjs           # Apply filters, find new tournaments, detect freed spots
+  
+  handler.mjs           # Main Lambda handler (orchestration only)
+
+index.mjs               # Entry point, exports handler
+run-local.mjs           # Local runner
+```
+
+## Tournament Data Structure
+
+Tournaments are parsed into structured objects (see `src/scraping/parser.mjs`):
+
+```javascript
+{
+  subdomain: "toulousepadelclub",
+  level: "P100",           // P50, P100, P250
+  date: "10 jan.",         // Day + month for display
+  dayOfWeek: "lundi",      // Full day name
+  time: "18h00-20h00",     // Time range
+  spots: 4,                // Available spots (0 = full)
+  isNocturne: true,        // time >= 18h or text contains "nocturne"
+  isFull: false,           // spots === 0
+  category: "homme",       // "homme", "femme", "mixte"
+  ageGroup: null,          // "+45" or null
+  isWaitlist: false,       // Contains "liste d'attente"
+  rawText: "...",          // Original text for debugging
+  id: "tpc-lun.10jan.-P100-18h00-20h00"  // Unique ID for DB comparison
+}
+```
+
 ## Key Files
 
-- **index.mjs** - Main handler and all business logic
-- **package.json** - Dependencies (puppeteer-core, chromium, nodemailer, AWS SDK)
+- **src/handler.mjs** - Main Lambda handler (orchestration only)
+- **src/config/index.mjs** - Environment variables, constants, subdomain list
+- **src/scraping/parser.mjs** - Core parsing logic (HTML text → structured data)
+- **src/filtering/rules.mjs** - Tournament filter functions
+- **src/email/formatter.mjs** - Simple email formatting (uses structured fields)
 - **run-local.mjs** - Local test runner
-- **Dockerfile** - AWS Lambda environment for local testing
-- **.env** - Runtime configuration (credentials, email lists)
 
 ## Core Concepts
 
 ### Subdomains Being Monitored
 
-Four padel club subdomains are scraped:
+Four padel club subdomains (defined in `src/config/index.mjs`):
 - `toulousepadelclub.gestion-sports.com`
 - `toppadel.gestion-sports.com`
 - `acepadelclub.gestion-sports.com`
 - `the-country-club-toulouse.gestion-sports.com`
 
-These are hardcoded in the `SUBDOMAINS` array in index.mjs. To add/remove a subdomain, edit the array and re-deploy.
-
 ### Tournament Filtering Logic
 
-After scraping, tournaments are filtered by:
-1. **Not full** - exclude tournaments ending with `_complet`
-2. **Gender** - exclude "femme" and "mixte" categories
-3. **Age** - exclude "+45" tournaments
-4. **Level** - only include P50, P100, or P250 level tournaments
+Filters are defined in `src/filtering/rules.mjs`:
 
-The rationale: the user is interested in men's amateur padel tournaments at specified skill levels.
+```javascript
+export const isNotFull = (t) => !t.isFull;
+export const isMen = (t) => t.category === "homme";
+export const isNotSenior = (t) => t.ageGroup !== "+45";
+export const isTargetLevel = (t) => ["P50", "P100", "P250"].includes(t.level);
+export const isNotWaitlist = (t) => !t.isWaitlist;
+```
 
-To modify filtering rules, edit the filter chain in the `processTournament` function. Each `.filter()` call is a rule—add, remove, or modify them as needed.
-
-### Scraping Strategy
-
-- Uses Puppeteer to automate login
-- Navigates to `/appli/Évènements` on each subdomain
-- Extracts tournament info from HTML using CSS selector: `app-evenements .w-100.contain app-input-search ~ div.mb-20`
-- Parses tournament text to extract: date, time, level, available slots, nocturne flag
-
-**Important**: CSS selectors and text parsing patterns are brittle. If the website HTML changes, selectors will fail silently or throw errors.
+To modify filters, edit `defaultFilters` array in `rules.mjs`.
 
 ### State Tracking
 
-DynamoDB table `tournaments` stores:
-- **Key**: `id: "latest-{subdomain}"` (per-subdomain tracking)
-- **Value**: JSON string of tournaments found in last run for that subdomain
+DynamoDB stores tournament IDs per subdomain:
+- **Key**: `id: "latest-{subdomain}"`
+- **Value**: JSON array of tournament IDs
 
-On each run:
-1. For each subdomain in parallel (via `processTournament`):
-   - Fetch latest tournaments from DB using `latest-{subdomain}` key
-   - Compare with current scrape
-   - Identify new tournaments (not in previous state, not full, passes filters)
-2. Collect all results (failed subdomains are skipped, successful ones aggregated)
-3. Send email if any new tournaments found across all subdomains
-4. Update DB only for subdomains with changes detected (after email is sent)
+Full tournaments are stored with `_full` suffix to detect freed spots.
 
-**Key benefit of per-subdomain keys**: If one subdomain's scrape fails, its DB record is not updated, preserving data for the next run. Other subdomains can still update independently.
+### Single DB Update Path
+
+DB updates happen once at the end of handler, after email is sent. No duplicate updates.
 
 ## Error Handling & Notifications
 
-### When to Notify Admin
+Admin notifications (`src/email/admin.mjs`) are sent for:
+1. **Login failures** - credentials or site changes
+2. **Missing welcome popup** - site structure may have changed
+3. **No tournaments found** - CSS selector may need update
 
-Email admin at `etienner37@gmail.com` if:
-
-1. **Login fails** for any subdomain - CSS selectors may have changed
-2. **Navigation fails** (can't reach `/appli/Évènements`) - site structure changed
-3. **Scraping fails** when extracting tournament info - HTML parsing needs debugging
-
-### Notification Format
-
-Keep emails simple:
-- **Subject**: `[Check Tournaments] Error on {subdomain}`
-- **Body**: Clear description of what failed + relevant error message
-- Do NOT include full stack traces or irrelevant logs
-
-Example existing pattern in `scrapeTournaments`: notification when welcome popup is missing.
-
-### Example: Adding Error Detection
-
-If a CSS selector fails and returns empty list, detect it and email:
-```javascript
-if (tournoisDivs.length === 0) {
-  await sendAdminNotification(`[${subdomain}] No tournaments found. Selector may have changed.`);
-  throw new Error(`No tournaments found for ${subdomain}`);
-}
-```
-
-Use the existing nodemailer transport pattern with `nodemailer.createTransport()` to send admin notifications.
-
-## Common Tasks for Agents
-
-### Debugging Scraping Issues
-
-1. Run locally: `npm start`
-2. Browser launches with `headless: false` so you can watch interactions
-3. Check console logs for which step fails
-4. If it's a selector issue, inspect the live page and update the CSS selector
-
-### Handling HTML Structure Changes
-
-1. User will receive admin notification email (once implemented)
-2. Agent should:
-   - Log into the website manually
-   - Inspect the HTML structure with DevTools
-   - Identify the new CSS selector or text pattern
-   - Update the selector/regex in index.mjs
-   - Test with `npm start`
-   - Verify email was sent on successful run
+## Common Tasks
 
 ### Adding a New Subdomain
 
-1. Add to `SUBDOMAINS` array (line 37)
-2. Verify login works (username/password same across clubs)
-3. Verify `/appli/Évènements` path exists
-4. Test locally with `npm start`
-5. Deploy (currently manual)
+1. Add to `SUBDOMAINS` array in `src/config/index.mjs`
+2. Test with `npm start`
 
-### Modifying Tournament Filters
+### Modifying Filters
 
-Edit the filter chain in the `processTournament` function. Example: to also include mixte tournaments:
-
+Edit `src/filtering/rules.mjs`. Example to include mixte:
 ```javascript
-// Remove this line:
-.filter((tournoi) => !tournoi.toLowerCase().includes("mixte"))
+export const isMen = (t) => t.category === "homme" || t.category === "mixte";
 ```
 
-## Email Formatting
+### Updating CSS Selectors
 
-The `formatTournament` function parses raw tournament text and formats it for email. It extracts:
-- Level (P50, P100, P250)
-- Date and time
-- Available slots
-- Nocturne flag (matches time >= 18h)
-- "Places libérées" prefix if tournament was previously full
+If scraping breaks, update selectors in `src/scraping/scraper.mjs`.
 
-This is complex but working. Only modify if email output format needs to change.
+### Updating Text Parsing
+
+If tournament text format changes, update regex patterns in `src/scraping/parser.mjs`.
 
 ## Local Testing
 
@@ -168,23 +159,12 @@ This is complex but working. Only modify if email output format needs to change.
 npm start
 ```
 
-Launches with `NODE_ENV=local`, uses regular Puppeteer (not puppeteer-core). Browser headless is `false` so you see what's happening.
+Browser opens in visible mode. Set `DEBUG=1` in `.env` to skip DB writes.
 
-For Docker/Lambda environment testing:
+For production test (writes to DB):
 ```bash
-docker build -t check .
-docker run -p 9000:8080 check:latest
-curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{}' -H "Content-Type: application/json"
+RUN_MODE=test npm start
 ```
-
-## Deployment
-
-Currently **manual** via AWS Console:
-- Code pushed to `check-tournaments` Lambda
-- Dependencies in `padelito` layer
-- Environment variables set in Lambda config
-
-Future: CI/CD with Terraform or similar tool (not yet implemented).
 
 ## Environment Variables Required
 
@@ -192,35 +172,17 @@ Future: CI/CD with Terraform or similar tool (not yet implemented).
 EMAIL              - Login email for padel websites
 PASSWORD           - Login password
 MAILING_LIST       - Comma-separated emails to notify
-EMAIL_APP_PASS     - Gmail app-specific password for sending emails
+EMAIL_APP_PASS     - Gmail app-specific password
 AWS_REGION         - DynamoDB region
-ACCESS_KEY_ID      - AWS credentials (local/non-production only)
-SECRET_ACCESS_KEY  - AWS credentials (local/non-production only)
+ACCESS_KEY_ID      - AWS credentials (local only)
+SECRET_ACCESS_KEY  - AWS credentials (local only)
 NODE_ENV           - "local" or unset for Lambda
-DEBUG              - If set, prevents writing to DynamoDB (useful for testing)
+DEBUG              - If set, skips DB writes
 ```
 
-## Code Style Notes
+## Code Style
 
-- Using ES modules (`.mjs` files)
-- JSDoc comments for function signatures
-- Error messages include `[subdomain]` prefix for clarity
-- All async operations use `await` (no floating promises)
-
-## Recent Refactorings
-
-### Jan 2026: Per-Subdomain State Tracking
-
-**Problem**: When one subdomain's scrape failed, the global DynamoDB record was overwritten with partial data, causing old tournaments to re-appear as new in subsequent runs.
-
-**Solution**: Changed from single `id: "latest"` key to per-subdomain keys (`id: "latest-{subdomain}"`). Now each subdomain maintains independent state—if one fails, others can still update their records.
-
-**Impact**: Eliminated duplicate tournament emails caused by state corruption.
-
-### Jan 2026: Parallel Processing with `processTournament`
-
-**Problem**: Code had nested loops that were hard to follow and made error handling unclear (which failures should prevent DB updates?).
-
-**Solution**: Extracted `processTournament` function that encapsulates the full workflow for one subdomain: scrape → fetch DB → filter → return results. All subdomains run in parallel via `Promise.allSettled`, then results are collected once.
-
-**Impact**: Clearer error boundaries, easier to test, failed subdomains no longer corrupt successful ones.
+- ES modules (`.mjs`)
+- JSDoc comments for types
+- Error messages prefixed with `[subdomain]`
+- Structured Tournament objects (no raw string parsing at email time)

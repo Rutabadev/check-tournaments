@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatEmailHtml > formats complex real-world scenario 1`] = `"<h2>toulousepadelclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> mercredi 15 jan. P100 20h00-22h00 2 places</p><p style="font-size:1rem;line-height:1.5rem"><b>samedi</b> 18 jan. P250 14h00-16h00 6 places</p><hr /><h2>toppadel</h2><p style="font-size:1rem;line-height:1.5rem">Places libérées: <b>nocturne</b> lundi 20 jan. P50 19h00-21h00 1 places</p>"`;
+
+exports[`formatEmailHtml > formats empty map 1`] = `""`;
+
+exports[`formatEmailHtml > formats multiple subdomains 1`] = `"<h2>club1</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p><hr /><h2>club2</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p>"`;
+
+exports[`formatEmailHtml > formats single subdomain with multiple tournaments 1`] = `"<h2>testclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p><p style="font-size:1rem;line-height:1.5rem">Places libérées: <b>samedi</b> 10 jan. P100 18h00-20h00 4 places</p>"`;
+
+exports[`formatEmailHtml > formats single subdomain with one tournament 1`] = `"<h2>testclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p>"`;
+
+exports[`formatTournament > adds freed spot prefix 1`] = `"Places libérées: <b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places"`;
+
+exports[`formatTournament > formats a Sunday tournament with bold day 1`] = `"<b>nocturne</b> <b>dimanche</b> 10 jan. P100 18h00-20h00 4 places"`;
+
+exports[`formatTournament > formats a basic nocturne tournament 1`] = `"<b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places"`;
+
+exports[`formatTournament > formats a daytime tournament (no nocturne) 1`] = `"lundi 10 jan. P100 18h00-20h00 4 places"`;
+
+exports[`formatTournament > formats a weekend tournament with bold day 1`] = `"<b>nocturne</b> <b>samedi</b> 10 jan. P100 18h00-20h00 4 places"`;
+
+exports[`formatTournament > formats tournament with many spots 1`] = `"<b>nocturne</b> lundi 10 jan. P100 18h00-20h00 12 places"`;
+
+exports[`formatTournament > handles null level gracefully 1`] = `"<b>nocturne</b> lundi 10 jan. 18h00-20h00 4 places"`;

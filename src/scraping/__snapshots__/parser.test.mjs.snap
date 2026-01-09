@@ -1,0 +1,109 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parseTournament > basic parsing > parses a full tournament (no spots) 1`] = `
+{
+  "ageGroup": null,
+  "category": "homme",
+  "date": "12 jan.",
+  "dayOfWeek": "mardi",
+  "id": "testclub-mar.12jan.-P100-20h00-22h00",
+  "isFull": true,
+  "isNocturne": true,
+  "isWaitlist": false,
+  "level": "P100",
+  "rawText": "P100 mar. 12 jan. 20h00-22h00 homme",
+  "spots": 0,
+  "subdomain": "testclub",
+  "time": "20h00-22h00",
+}
+`;
+
+exports[`parseTournament > basic parsing > parses a standard tournament 1`] = `
+{
+  "ageGroup": null,
+  "category": "homme",
+  "date": "10 jan.",
+  "dayOfWeek": "lundi",
+  "id": "testclub-lun.10jan.-P100-18h00-20h00",
+  "isFull": false,
+  "isNocturne": true,
+  "isWaitlist": false,
+  "level": "P100",
+  "rawText": "P100 lun. 10 jan. 18h00-20h00 4 places restantes homme",
+  "spots": 4,
+  "subdomain": "testclub",
+  "time": "18h00-20h00",
+}
+`;
+
+exports[`parseTournament > basic parsing > parses a weekend tournament 1`] = `
+{
+  "ageGroup": null,
+  "category": "homme",
+  "date": "15 jan.",
+  "dayOfWeek": "samedi",
+  "id": "testclub-sam.15jan.-P250-14h00-16h00",
+  "isFull": false,
+  "isNocturne": false,
+  "isWaitlist": false,
+  "level": "P250",
+  "rawText": "P250 sam. 15 jan. 14h00-16h00 2 places restantes homme",
+  "spots": 2,
+  "subdomain": "testclub",
+  "time": "14h00-16h00",
+}
+`;
+
+exports[`parseTournament > real-world examples > parses complex tournament text 1`] = `
+{
+  "ageGroup": null,
+  "category": "homme",
+  "date": "20 jan.",
+  "dayOfWeek": "lundi",
+  "id": "toulousepadelclub-lun.20jan.-P100-18h00-20h00",
+  "isFull": false,
+  "isNocturne": true,
+  "isWaitlist": false,
+  "level": "P100",
+  "rawText": "Tournoi P100         lun. 20 jan.         18h00-20h00         homme         6 places restantes",
+  "spots": 6,
+  "subdomain": "toulousepadelclub",
+  "time": "18h00-20h00",
+}
+`;
+
+exports[`parseTournament > real-world examples > parses senior women tournament 1`] = `
+{
+  "ageGroup": "+45",
+  "category": "femme",
+  "date": "25 jan.",
+  "dayOfWeek": "vendredi",
+  "id": "acepadelclub-ven.25jan.-P250-14h00-16h00",
+  "isFull": false,
+  "isNocturne": false,
+  "isWaitlist": false,
+  "level": "P250",
+  "rawText": "P250 femme +45 ven. 25 jan. 14h00-16h00 2 places restantes",
+  "spots": 2,
+  "subdomain": "acepadelclub",
+  "time": "14h00-16h00",
+}
+`;
+
+exports[`parseTournament > real-world examples > parses waitlist tournament 1`] = `
+{
+  "ageGroup": null,
+  "category": "homme",
+  "date": "10 jan.",
+  "dayOfWeek": "lundi",
+  "id": "toppadel-lun.10jan.-P100-20h00-22h00",
+  "isFull": true,
+  "isNocturne": true,
+  "isWaitlist": true,
+  "level": "P100",
+  "rawText": "P100 lun. 10 jan. 20h00-22h00 homme liste d'attente",
+  "spots": 0,
+  "subdomain": "toppadel",
+  "time": "20h00-22h00",
+}
+`;
