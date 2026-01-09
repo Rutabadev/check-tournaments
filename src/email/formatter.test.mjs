@@ -20,42 +20,56 @@ const baseTournament = {
 describe("formatTournament", () => {
   it("formats a basic nocturne tournament", () => {
     const result = formatTournament(baseTournament);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places"`
+    );
   });
 
   it("formats a daytime tournament (no nocturne)", () => {
     const daytime = { ...baseTournament, isNocturne: false };
     const result = formatTournament(daytime);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"lundi 10 jan. P100 18h00-20h00 4 places"`
+    );
   });
 
   it("formats a weekend tournament with bold day", () => {
     const weekend = { ...baseTournament, dayOfWeek: "samedi" };
     const result = formatTournament(weekend);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<b>nocturne</b> <b>samedi</b> 10 jan. P100 18h00-20h00 4 places"`
+    );
   });
 
   it("formats a Sunday tournament with bold day", () => {
     const sunday = { ...baseTournament, dayOfWeek: "dimanche" };
     const result = formatTournament(sunday);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<b>nocturne</b> <b>dimanche</b> 10 jan. P100 18h00-20h00 4 places"`
+    );
   });
 
   it("adds freed spot prefix", () => {
     const result = formatTournament(baseTournament, { isFreedSpot: true });
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"Places libérées: <b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places"`
+    );
   });
 
   it("handles null level gracefully", () => {
     const noLevel = { ...baseTournament, level: null };
     const result = formatTournament(noLevel);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<b>nocturne</b> lundi 10 jan. 18h00-20h00 4 places"`
+    );
   });
 
   it("formats tournament with many spots", () => {
     const manySpots = { ...baseTournament, spots: 12 };
     const result = formatTournament(manySpots);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<b>nocturne</b> lundi 10 jan. P100 18h00-20h00 12 places"`
+    );
   });
 });
 
@@ -65,7 +79,9 @@ describe("formatEmailHtml", () => {
       ["testclub", [{ tournament: baseTournament, isFreedSpot: false }]],
     ]);
     const result = formatEmailHtml(map);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<h2>testclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p>"`
+    );
   });
 
   it("formats single subdomain with multiple tournaments", () => {
@@ -86,7 +102,9 @@ describe("formatEmailHtml", () => {
       ],
     ]);
     const result = formatEmailHtml(map);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<h2>testclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p><p style="font-size:1rem;line-height:1.5rem">Places libérées: <b>samedi</b> 10 jan. P100 18h00-20h00 4 places</p>"`
+    );
   });
 
   it("formats multiple subdomains", () => {
@@ -97,13 +115,15 @@ describe("formatEmailHtml", () => {
       ["club2", [{ tournament: t2, isFreedSpot: false }]],
     ]);
     const result = formatEmailHtml(map);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<h2>club1</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p><hr /><h2>club2</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p>"`
+    );
   });
 
   it("formats empty map", () => {
     const map = new Map();
     const result = formatEmailHtml(map);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(`""`);
   });
 
   it("formats complex real-world scenario", () => {
@@ -149,6 +169,8 @@ describe("formatEmailHtml", () => {
       ["toppadel", [{ tournament: freed, isFreedSpot: true }]],
     ]);
     const result = formatEmailHtml(map);
-    expect(result).toMatchSnapshot();
+    expect(result).toMatchInlineSnapshot(
+      `"<h2>toulousepadelclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> mercredi 15 jan. P100 20h00-22h00 2 places</p><p style="font-size:1rem;line-height:1.5rem"><b>samedi</b> 18 jan. P250 14h00-16h00 6 places</p><hr /><h2>toppadel</h2><p style="font-size:1rem;line-height:1.5rem">Places libérées: <b>nocturne</b> lundi 20 jan. P50 19h00-21h00 1 places</p>"`
+    );
   });
 });
