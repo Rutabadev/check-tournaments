@@ -172,6 +172,45 @@ describe("parseTournament", () => {
     });
   });
 
+  describe("youth group detection", () => {
+    it("detects U14 youth group", () => {
+      const result = parseTournament(
+        el("P100 U14 lun. 10 jan. 18h00"),
+        "test"
+      );
+      expect(result.youthGroup).toBe("U14");
+    });
+
+    it("detects U16 youth group", () => {
+      const result = parseTournament(
+        el("P100 U16 lun. 10 jan. 18h00"),
+        "test"
+      );
+      expect(result.youthGroup).toBe("U16");
+    });
+
+    it("handles lowercase u", () => {
+      const result = parseTournament(
+        el("P100 u14 lun. 10 jan. 18h00"),
+        "test"
+      );
+      expect(result.youthGroup).toBe("U14");
+    });
+
+    it("handles U with space before number", () => {
+      const result = parseTournament(
+        el("P100 U 14 lun. 10 jan. 18h00"),
+        "test"
+      );
+      expect(result.youthGroup).toBe("U14");
+    });
+
+    it("returns null when no youth group", () => {
+      const result = parseTournament(el("P100 lun. 10 jan. 18h00"), "test");
+      expect(result.youthGroup).toBe(null);
+    });
+  });
+
   describe("waitlist detection", () => {
     it("detects waitlist tournament", () => {
       const result = parseTournament(

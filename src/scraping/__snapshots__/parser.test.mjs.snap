@@ -15,6 +15,7 @@ exports[`parseTournament > basic parsing > parses a full tournament (no spots) 1
   "spots": 0,
   "subdomain": "testclub",
   "time": "20h00-22h00",
+  "youthGroup": null,
 }
 `;
 
@@ -33,6 +34,7 @@ exports[`parseTournament > basic parsing > parses a standard tournament 1`] = `
   "spots": 4,
   "subdomain": "testclub",
   "time": "18h00-20h00",
+  "youthGroup": null,
 }
 `;
 
@@ -51,6 +53,7 @@ exports[`parseTournament > basic parsing > parses a weekend tournament 1`] = `
   "spots": 2,
   "subdomain": "testclub",
   "time": "14h00-16h00",
+  "youthGroup": null,
 }
 `;
 
@@ -69,6 +72,7 @@ exports[`parseTournament > real-world examples > parses a real life tournament 1
   "spots": 6,
   "subdomain": "testclub",
   "time": "19h30-23h30",
+  "youthGroup": null,
 }
 `;
 
@@ -87,6 +91,7 @@ exports[`parseTournament > real-world examples > parses complex tournament text 
   "spots": 6,
   "subdomain": "toulousepadelclub",
   "time": "18h00-20h00",
+  "youthGroup": null,
 }
 `;
 
@@ -105,6 +110,7 @@ exports[`parseTournament > real-world examples > parses senior women tournament 
   "spots": 2,
   "subdomain": "acepadelclub",
   "time": "14h00-16h00",
+  "youthGroup": null,
 }
 `;
 
@@ -123,5 +129,6 @@ exports[`parseTournament > real-world examples > parses waitlist tournament 1`] 
   "spots": 0,
   "subdomain": "toppadel",
   "time": "20h00-22h00",
+  "youthGroup": null,
 }
 `;

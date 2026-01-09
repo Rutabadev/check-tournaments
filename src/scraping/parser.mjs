@@ -12,6 +12,7 @@ import { DAY_ABBREV_MAP } from "../config/index.mjs";
  * @property {boolean} isFull
  * @property {string} category - "homme", "femme", "mixte"
  * @property {string|null} ageGroup - "+45" or null
+ * @property {string|null} youthGroup - "U14", "U16", etc. or null
  * @property {string} rawText - Original text for debugging
  * @property {string} id - Unique ID for DB comparison
  */
@@ -64,6 +65,9 @@ export function parseTournament(elementData, subdomain) {
   const ageMatch = text.match(/\+\s*(\d+)/);
   const ageGroup = ageMatch ? `+${ageMatch[1]}` : null;
 
+  const youthMatch = text.match(/\bU\s?(\d+)\b/i);
+  const youthGroup = youthMatch ? `U${youthMatch[1]}` : null;
+
   const isWaitlist = ["liste", "attente"].every((word) =>
     textLower.includes(word)
   );
@@ -86,6 +90,7 @@ export function parseTournament(elementData, subdomain) {
     isFull: spots === 0,
     category,
     ageGroup,
+    youthGroup,
     isWaitlist,
     rawText: text,
     id,

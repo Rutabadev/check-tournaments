@@ -14,6 +14,9 @@ export const isMen = (t) => t.category === "homme";
 export const isNotSenior = (t) => t.ageGroup !== "+45";
 
 /** @param {Tournament} t */
+export const isNotYouth = (t) => t.youthGroup === null;
+
+/** @param {Tournament} t */
 export const isTargetLevel = (t) => TARGET_LEVELS.includes(t.level);
 
 /** @param {Tournament} t */
@@ -23,6 +26,7 @@ export const defaultFilters = [
   isNotFull,
   isMen,
   isNotSenior,
+  isNotYouth,
   isTargetLevel,
   isNotWaitlist,
 ];

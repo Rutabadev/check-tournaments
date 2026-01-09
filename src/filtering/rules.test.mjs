@@ -3,6 +3,7 @@ import {
   isNotFull,
   isMen,
   isNotSenior,
+  isNotYouth,
   isTargetLevel,
   isNotWaitlist,
   defaultFilters,
@@ -19,6 +20,7 @@ const baseTournament = {
   isFull: false,
   category: "homme",
   ageGroup: null,
+  youthGroup: null,
   isWaitlist: false,
   rawText: "test",
   id: "test-id",
@@ -62,6 +64,20 @@ describe("isNotSenior", () => {
   });
 });
 
+describe("isNotYouth", () => {
+  it("returns true when no youth group", () => {
+    expect(isNotYouth({ ...baseTournament, youthGroup: null })).toBe(true);
+  });
+
+  it("returns false for U14 tournaments", () => {
+    expect(isNotYouth({ ...baseTournament, youthGroup: "U14" })).toBe(false);
+  });
+
+  it("returns false for U16 tournaments", () => {
+    expect(isNotYouth({ ...baseTournament, youthGroup: "U16" })).toBe(false);
+  });
+});
+
 describe("isTargetLevel", () => {
   it("returns true for P50", () => {
     expect(isTargetLevel({ ...baseTournament, level: "P50" })).toBe(true);
@@ -95,11 +111,12 @@ describe("isNotWaitlist", () => {
 });
 
 describe("defaultFilters", () => {
-  it("contains all 5 filter functions", () => {
-    expect(defaultFilters).toHaveLength(5);
+  it("contains all 6 filter functions", () => {
+    expect(defaultFilters).toHaveLength(6);
     expect(defaultFilters).toContain(isNotFull);
     expect(defaultFilters).toContain(isMen);
     expect(defaultFilters).toContain(isNotSenior);
+    expect(defaultFilters).toContain(isNotYouth);
     expect(defaultFilters).toContain(isTargetLevel);
     expect(defaultFilters).toContain(isNotWaitlist);
   });

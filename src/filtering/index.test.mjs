@@ -16,6 +16,7 @@ const validTournament = {
   isFull: false,
   category: "homme",
   ageGroup: null,
+  youthGroup: null,
   isWaitlist: false,
   rawText: "test",
   id: "test-id-1",
