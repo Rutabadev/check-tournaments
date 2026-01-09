@@ -24,7 +24,7 @@ export async function login(page, subdomain) {
     });
     await page.waitForNavigation({
       waitUntil: "networkidle0",
-      timeout: 10000,
+      timeout: 20000,
     });
     console.log(`[${subdomain}] Login done`);
   } catch (error) {
