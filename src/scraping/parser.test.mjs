@@ -42,7 +42,10 @@ describe("parseTournament", () => {
 
   describe("level extraction", () => {
     it("extracts P50 level", () => {
-      const result = parseTournament(el("P50 lun. 10 jan. 18h00 homme"), "test");
+      const result = parseTournament(
+        el("P50 lun. 10 jan. 18h00 homme"),
+        "test"
+      );
       expect(result.level).toBe("P50");
     });
 
@@ -124,12 +127,25 @@ describe("parseTournament", () => {
       expect(result.isNocturne).toBe(true);
     });
 
-    it("detects nocturne by keyword", () => {
+    it("detects nocturne by with 'nocture' keyword", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 14h00 nocturne"),
         "test"
       );
       expect(result.isNocturne).toBe(true);
+    });
+
+    it("detects nocturne by with 'soirée/soiree' keyword", () => {
+      const result1 = parseTournament(
+        el("P100 lun. 10 jan. 14h00 soirée"),
+        "test"
+      );
+      const result2 = parseTournament(
+        el("P100 lun. 10 jan. 14h00 soiree"),
+        "test"
+      );
+      expect(result1.isNocturne).toBe(true);
+      expect(result2.isNocturne).toBe(true);
     });
 
     it("not nocturne for daytime", () => {
@@ -143,18 +159,12 @@ describe("parseTournament", () => {
 
   describe("age group detection", () => {
     it("detects +45 age group", () => {
-      const result = parseTournament(
-        el("P100 +45 lun. 10 jan. 18h00"),
-        "test"
-      );
+      const result = parseTournament(el("P100 +45 lun. 10 jan. 18h00"), "test");
       expect(result.ageGroup).toBe("+45");
     });
 
     it("detects +35 age group", () => {
-      const result = parseTournament(
-        el("P100 +35 lun. 10 jan. 18h00"),
-        "test"
-      );
+      const result = parseTournament(el("P100 +35 lun. 10 jan. 18h00"), "test");
       expect(result.ageGroup).toBe("+35");
     });
 
@@ -174,26 +184,17 @@ describe("parseTournament", () => {
 
   describe("youth group detection", () => {
     it("detects U14 youth group", () => {
-      const result = parseTournament(
-        el("P100 U14 lun. 10 jan. 18h00"),
-        "test"
-      );
+      const result = parseTournament(el("P100 U14 lun. 10 jan. 18h00"), "test");
       expect(result.youthGroup).toBe("U14");
     });
 
     it("detects U16 youth group", () => {
-      const result = parseTournament(
-        el("P100 U16 lun. 10 jan. 18h00"),
-        "test"
-      );
+      const result = parseTournament(el("P100 U16 lun. 10 jan. 18h00"), "test");
       expect(result.youthGroup).toBe("U16");
     });
 
     it("handles lowercase u", () => {
-      const result = parseTournament(
-        el("P100 u14 lun. 10 jan. 18h00"),
-        "test"
-      );
+      const result = parseTournament(el("P100 u14 lun. 10 jan. 18h00"), "test");
       expect(result.youthGroup).toBe("U14");
     });
 

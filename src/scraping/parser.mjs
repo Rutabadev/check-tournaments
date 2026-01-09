@@ -56,6 +56,12 @@ export function parseTournament(elementData, subdomain) {
     elementData.hasButton && spotsMatch ? parseInt(spotsMatch[1]) : 0;
 
   const textLower = text.toLowerCase();
+  const isNocturne =
+    textLower.includes("soirée") ||
+    textLower.includes("soiree") ||
+    textLower.includes("nocturne") ||
+    (startHour !== null && startHour >= 18);
+
   const category = textLower.includes("femme")
     ? "femme"
     : textLower.includes("mixte")
@@ -85,8 +91,7 @@ export function parseTournament(elementData, subdomain) {
     dayOfWeek: DAY_ABBREV_MAP[dayAbbrev] || dayAbbrev,
     time,
     spots,
-    isNocturne:
-      (startHour !== null && startHour >= 18) || textLower.includes("nocturne"),
+    isNocturne,
     isFull: spots === 0,
     category,
     ageGroup,
