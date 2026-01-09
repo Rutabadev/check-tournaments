@@ -26,15 +26,6 @@ export function findNewTournaments(currentTournaments, previousTournaments) {
 
   return filtered
     .filter((t) => {
-      if (
-        t.rawText ===
-        "PADEL OPEN 25,00 € / P TOURNOIS HOMOLOGUES P250 Hommes matin  Ven. 16 Janv.  07h30 - 12h00  1 place(s) restante(s)  Je m'inscris"
-      ) {
-        console.log("-----current------");
-        console.log(t);
-        console.log("-----previous------");
-        console.log(previousById.get(t.id));
-      }
       const previous = previousById.get(t.id);
       return !previous || (previous.isFull && !t.isFull);
     })
