@@ -5,6 +5,20 @@ import { defaultFilters } from "./rules.mjs";
  */
 
 /**
+ * Get the storage ID for a tournament (base ID + suffixes for state tracking)
+ * @param {Tournament} tournament
+ * @param {{ asFull?: boolean }} [options] - Override isFull state
+ * @returns {string}
+ */
+function getStorageId(tournament, options = {}) {
+  let id = tournament.id;
+  if (tournament.isWaitlist) id += "_waitlist";
+  const isFull = options.asFull ?? tournament.isFull;
+  if (isFull) id += "_full";
+  return id;
+}
+
+/**
  * Apply default filters to tournaments
  * @param {Tournament[]} tournaments
  * @returns {Tournament[]}
@@ -27,23 +41,24 @@ export function findNewTournaments(currentTournaments, previousIds) {
 
   return filtered
     .filter((t) => {
-      const wasKnown = previousIdSet.has(t.id);
-      const wasFullId = t.id + "_full";
+      const storageId = getStorageId(t);
+      const wasKnown = previousIdSet.has(storageId);
+      const wasFullId = getStorageId(t, { asFull: true });
       const wasFullBefore = previousIdSet.has(wasFullId);
       return !wasKnown || wasFullBefore;
     })
     .map((tournament) => {
-      const wasFullId = tournament.id + "_full";
-      const isFreedSpot = previousIds.includes(wasFullId);
+      const wasFullId = getStorageId(tournament, { asFull: true });
+      const isFreedSpot = previousIdSet.has(wasFullId);
       return { tournament, isFreedSpot };
     });
 }
 
 /**
- * Get IDs for DB storage (includes _full suffix for full tournaments)
+ * Get IDs for DB storage (includes suffixes for state tracking)
  * @param {Tournament[]} tournaments
  * @returns {string[]}
  */
 export function getTournamentIdsForStorage(tournaments) {
-  return tournaments.map((t) => (t.isFull ? t.id + "_full" : t.id));
+  return tournaments.map((t) => getStorageId(t));
 }

@@ -170,32 +170,34 @@ async function closeWelcomePopup(page, subdomain) {
 }
 
 // src/scraping/parser.mjs
-function parseTournament(innerText, subdomain) {
-  const text = innerText.replace(/\n/g, " ").trim();
-  const levelMatch = text.match(/\b(P\d+)\b/i);
-  const level = levelMatch ? levelMatch[1].toUpperCase() : null;
-  const dateMatch = text.match(
-    /([a-zé]{3}\.)\s+(\d{1,2})\s+([a-zé]{3,4}\.)/i
-  );
+function parseTournament(elementData, subdomain) {
+  const text = elementData.innerText.replace(/\n/g, " ").trim();
+  const levelMatch = text.match(/\b(P\s?\d+)\b/i);
+  const level = levelMatch ? levelMatch[1].toUpperCase().replaceAll(" ", "") : null;
+  const dateMatch = text.match(/([a-zé]{3}\.)\s+(\d{1,2})\s+([a-zé]{3,4}\.)/i);
   const dayAbbrev = dateMatch?.[1]?.toLowerCase() || "";
   const dayNum = dateMatch?.[2] || "";
   const month = dateMatch?.[3] || "";
-  const timeMatch = text.match(
-    /(\d{2})h(\d{2})(?:\s*-\s*(\d{2})h(\d{2}))?/
-  );
+  const timeMatch = text.match(/(\d{2})h(\d{2})(?:\s*-\s*(\d{2})h(\d{2}))?/);
   const startHour = timeMatch ? parseInt(timeMatch[1]) : null;
   const time = timeMatch ? timeMatch[3] ? `${timeMatch[1]}h${timeMatch[2]}-${timeMatch[3]}h${timeMatch[4]}` : `${timeMatch[1]}h${timeMatch[2]}` : "";
-  const spotsMatch = text.match(/(\d+)\s*places?\s*restantes?/i);
-  const spots = spotsMatch ? parseInt(spotsMatch[1]) : 0;
+  const spotsMatch = elementData.spots?.match(/(\d+)/);
+  const spots = elementData.hasButton && spotsMatch ? parseInt(spotsMatch[1]) : 0;
   const textLower = text.toLowerCase();
+  const isNocturne = textLower.includes("soir\xE9e") || textLower.includes("soiree") || textLower.includes("nocturne") || startHour !== null && startHour >= 18;
   const category = textLower.includes("femme") ? "femme" : textLower.includes("mixte") ? "mixte" : "homme";
   const ageMatch = text.match(/\+\s*(\d+)/);
   const ageGroup = ageMatch ? `+${ageMatch[1]}` : null;
-  const isWaitlist = textLower.includes("liste d'attente");
-  const id = `${subdomain}-${dayAbbrev}${dayNum}${month}-${level}-${time}`.replace(
+  const youthMatch = text.match(/\bU\s?(\d+)\b/i);
+  const youthGroup = youthMatch ? `U${youthMatch[1]}` : null;
+  const isWaitlist = ["liste", "attente"].every(
+    (word) => textLower.includes(word)
+  );
+  const baseId = `${dayAbbrev}${dayNum}${month}-${level}-${time}`.replace(
     /\s+/g,
     ""
   );
+  const id = isWaitlist ? `${baseId}_waitlist` : baseId;
   return {
     subdomain,
     level,
@@ -203,10 +205,11 @@ function parseTournament(innerText, subdomain) {
     dayOfWeek: DAY_ABBREV_MAP[dayAbbrev] || dayAbbrev,
     time,
     spots,
-    isNocturne: startHour !== null && startHour >= 18 || textLower.includes("nocturne"),
+    isNocturne,
     isFull: spots === 0,
     category,
     ageGroup,
+    youthGroup,
     isWaitlist,
     rawText: text,
     id
@@ -223,10 +226,10 @@ async function scrapeTournaments(browser, subdomain) {
     await page.waitForSelector(
       "app-evenements .w-100.contain app-input-search"
     );
-    const tournoisDivs = await page.$$(
+    const tournamentsDivs = await page.$$(
       "app-evenements .w-100.contain app-input-search ~ div.mb-20"
     );
-    if (tournoisDivs.length === 0) {
+    if (tournamentsDivs.length === 0) {
       console.log(`[${subdomain}] No tournament divs found`);
       await sendAdminNotification(
         `[Check Tournaments] No tournaments found on ${subdomain}`,
@@ -234,15 +237,18 @@ async function scrapeTournaments(browser, subdomain) {
       );
     }
     const tournaments = await Promise.all(
-      tournoisDivs.map(async (tournoiDiv) => {
+      tournamentsDivs.map(async (tournamentDiv) => {
         try {
-          const innerText = await tournoiDiv.evaluate(
-            (node) => (
-              /** @type {HTMLElement} */
-              node.innerText
-            )
-          );
-          return parseTournament(innerText, subdomain);
+          const elementData = await tournamentDiv.evaluate((el) => {
+            if (!el) return null;
+            return {
+              innerText: el.innerText || "",
+              spots: el.querySelector("div.fd-column.ai-end > p")?.innerText || null,
+              hasButton: el.querySelector("div.fl.jc-center .button") !== null
+            };
+          });
+          if (!elementData) return null;
+          return parseTournament(elementData, subdomain);
         } catch (error) {
           console.error(`[${subdomain}] Error parsing tournament:`, error);
           return null;
@@ -330,12 +336,14 @@ async function updateDatabase(client, updates) {
 var isNotFull = (t) => !t.isFull;
 var isMen = (t) => t.category === "homme";
 var isNotSenior = (t) => t.ageGroup !== "+45";
+var isNotYouth = (t) => t.youthGroup === null;
 var isTargetLevel = (t) => TARGET_LEVELS.includes(t.level);
 var isNotWaitlist = (t) => !t.isWaitlist;
 var defaultFilters = [
   isNotFull,
   isMen,
   isNotSenior,
+  isNotYouth,
   isTargetLevel,
   isNotWaitlist
 ];

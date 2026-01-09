@@ -297,15 +297,15 @@ describe("parseTournament", () => {
   });
 
   describe("ID generation", () => {
-    it("generates unique ID with subdomain, date, level, time", () => {
+    it("generates unique ID with date, level, time (no subdomain)", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00-20h00"),
         "myclub"
       );
-      expect(result.id).toBe("myclub-lun.10jan.-P100-18h00-20h00");
+      expect(result.id).toBe("lun.10jan.-P100-18h00-20h00");
     });
 
-    it("handles different subdomains", () => {
+    it("same ID for same tournament across subdomains", () => {
       const result1 = parseTournament(
         el("P100 lun. 10 jan. 18h00-20h00"),
         "club1"
@@ -314,7 +314,16 @@ describe("parseTournament", () => {
         el("P100 lun. 10 jan. 18h00-20h00"),
         "club2"
       );
-      expect(result1.id).not.toBe(result2.id);
+      expect(result1.id).toBe(result2.id);
+    });
+
+    it("does not add suffix for waitlist (handled by storage)", () => {
+      const result = parseTournament(
+        el("P100 lun. 10 jan. 18h00-20h00 liste d'attente"),
+        "myclub"
+      );
+      expect(result.id).toBe("lun.10jan.-P100-18h00-20h00");
+      expect(result.isWaitlist).toBe(true);
     });
   });
 

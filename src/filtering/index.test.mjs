@@ -49,7 +49,11 @@ describe("applyFilters", () => {
   });
 
   it("removes waitlist tournaments", () => {
-    const waitlist = { ...validTournament, isWaitlist: true, id: "waitlist-id" };
+    const waitlist = {
+      ...validTournament,
+      isWaitlist: true,
+      id: "waitlist-id",
+    };
     expect(applyFilters([waitlist])).toEqual([]);
   });
 
@@ -66,7 +70,9 @@ describe("applyFilters", () => {
 describe("findNewTournaments", () => {
   it("returns new tournaments not in previous IDs", () => {
     const result = findNewTournaments([validTournament], []);
-    expect(result).toEqual([{ tournament: validTournament, isFreedSpot: false }]);
+    expect(result).toEqual([
+      { tournament: validTournament, isFreedSpot: false },
+    ]);
   });
 
   it("excludes tournaments already known", () => {
@@ -76,7 +82,9 @@ describe("findNewTournaments", () => {
 
   it("detects freed spots (was full, now available)", () => {
     const result = findNewTournaments([validTournament], ["test-id-1_full"]);
-    expect(result).toEqual([{ tournament: validTournament, isFreedSpot: true }]);
+    expect(result).toEqual([
+      { tournament: validTournament, isFreedSpot: true },
+    ]);
   });
 
   it("still applies filters before checking IDs", () => {
@@ -95,15 +103,23 @@ describe("findNewTournaments", () => {
     const result = findNewTournaments([new1, new2, known, freed], previousIds);
 
     expect(result).toHaveLength(3);
-    expect(result.find((r) => r.tournament.id === "new-1")?.isFreedSpot).toBe(false);
-    expect(result.find((r) => r.tournament.id === "new-2")?.isFreedSpot).toBe(false);
-    expect(result.find((r) => r.tournament.id === "freed")?.isFreedSpot).toBe(true);
+    expect(result.find((r) => r.tournament.id === "new-1")?.isFreedSpot).toBe(
+      false
+    );
+    expect(result.find((r) => r.tournament.id === "new-2")?.isFreedSpot).toBe(
+      false
+    );
+    expect(result.find((r) => r.tournament.id === "freed")?.isFreedSpot).toBe(
+      true
+    );
   });
 });
 
 describe("getTournamentIdsForStorage", () => {
   it("returns IDs without suffix for available tournaments", () => {
-    expect(getTournamentIdsForStorage([validTournament])).toEqual(["test-id-1"]);
+    expect(getTournamentIdsForStorage([validTournament])).toEqual([
+      "test-id-1",
+    ]);
   });
 
   it("adds _full suffix for full tournaments", () => {
@@ -111,12 +127,32 @@ describe("getTournamentIdsForStorage", () => {
     expect(getTournamentIdsForStorage([full])).toEqual(["test-id-1_full"]);
   });
 
+  it("adds _waitlist suffix for waitlist tournaments", () => {
+    const waitlist = { ...validTournament, isWaitlist: true };
+    expect(getTournamentIdsForStorage([waitlist])).toEqual([
+      "test-id-1_waitlist",
+    ]);
+  });
+
+  it("adds both _waitlist and _full suffixes when applicable", () => {
+    const waitlistFull = { ...validTournament, isWaitlist: true, isFull: true };
+    expect(getTournamentIdsForStorage([waitlistFull])).toEqual([
+      "test-id-1_waitlist_full",
+    ]);
+  });
+
   it("handles mixed tournaments", () => {
-    const available = { ...validTournament, id: "avail" };
-    const full = { ...validTournament, id: "full", isFull: true };
-    expect(getTournamentIdsForStorage([available, full])).toEqual([
-      "avail",
-      "full_full",
+    const available = { ...validTournament, id: "available-tournament" };
+    const full = { ...validTournament, id: "full-tournament", isFull: true };
+    const waitlist = {
+      ...validTournament,
+      id: "waitlist-tournament",
+      isWaitlist: true,
+    };
+    expect(getTournamentIdsForStorage([available, full, waitlist])).toEqual([
+      "available-tournament",
+      "full-tournament_full",
+      "waitlist-tournament_waitlist",
     ]);
   });
 });

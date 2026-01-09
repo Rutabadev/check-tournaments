@@ -38,7 +38,7 @@ export function parseTournament(elementData, subdomain) {
     ? levelMatch[1].toUpperCase().replaceAll(" ", "")
     : null;
 
-  const dateMatch = text.match(/([a-zé]{3}\.)\s+(\d{1,2})\s+([a-zé]{3,4}\.)/i);
+  const dateMatch = text.match(/([a-zé]{3}\.)\s+(\d{1,2})\s+([a-zé]{3,5}\.?)/i);
   const dayAbbrev = dateMatch?.[1]?.toLowerCase() || "";
   const dayNum = dateMatch?.[2] || "";
   const month = dateMatch?.[3] || "";
@@ -78,11 +78,10 @@ export function parseTournament(elementData, subdomain) {
     textLower.includes(word)
   );
 
-  const id =
-    `${subdomain}-${dayAbbrev}${dayNum}${month}-${level}-${time}`.replace(
-      /\s+/g,
-      ""
-    );
+  const id = `${dayAbbrev}${dayNum}${month}-${level}-${time}`.replace(
+    /\s+/g,
+    ""
+  );
 
   return {
     subdomain,
