@@ -43,6 +43,11 @@ describe("parseTournament", () => {
       expect(result.level).toBe(null);
     });
 
+    it("handles level with space", () => {
+      const result = parseTournament("P 100 lun. 10 jan. 18h00 homme", "test");
+      expect(result.level).toBe("P100");
+    });
+
     it("normalizes lowercase level to uppercase", () => {
       const result = parseTournament("p100 lun. 10 jan. 18h00 homme", "test");
       expect(result.level).toBe("P100");
@@ -78,7 +83,10 @@ describe("parseTournament", () => {
     });
 
     it("detects nocturne by keyword", () => {
-      const result = parseTournament("P100 lun. 10 jan. 14h00 nocturne", "test");
+      const result = parseTournament(
+        "P100 lun. 10 jan. 14h00 nocturne",
+        "test"
+      );
       expect(result.isNocturne).toBe(true);
     });
 
@@ -112,7 +120,10 @@ describe("parseTournament", () => {
 
   describe("waitlist detection", () => {
     it("detects waitlist tournament", () => {
-      const result = parseTournament("P100 lun. 10 jan. 18h00 liste d'attente", "test");
+      const result = parseTournament(
+        "P100 lun. 10 jan. 18h00 liste d'attente",
+        "test"
+      );
       expect(result.isWaitlist).toBe(true);
     });
 
@@ -124,17 +135,34 @@ describe("parseTournament", () => {
 
   describe("spots parsing", () => {
     it("parses single digit spots", () => {
-      const result = parseTournament("P100 lun. 10 jan. 18h00 4 places restantes", "test");
+      const result = parseTournament(
+        "P100 lun. 10 jan. 18h00 4 places restantes",
+        "test"
+      );
       expect(result.spots).toBe(4);
     });
 
     it("parses double digit spots", () => {
-      const result = parseTournament("P100 lun. 10 jan. 18h00 12 places restantes", "test");
+      const result = parseTournament(
+        "P100 lun. 10 jan. 18h00 12 places restantes",
+        "test"
+      );
       expect(result.spots).toBe(12);
     });
 
     it("handles singular place", () => {
-      const result = parseTournament("P100 lun. 10 jan. 18h00 1 place restante", "test");
+      const result = parseTournament(
+        "P100 lun. 10 jan. 18h00 1 place restante",
+        "test"
+      );
+      expect(result.spots).toBe(1);
+    });
+
+    it("parses spots with parenthesis", () => {
+      const result = parseTournament(
+        "P100 lun. 10 jan. 18h00 1 place(s) restante(s)",
+        "test"
+      );
       expect(result.spots).toBe(1);
     });
 
@@ -197,6 +225,13 @@ describe("parseTournament", () => {
     it("parses waitlist tournament", () => {
       const text = "P100 lun. 10 jan. 20h00-22h00 homme liste d'attente";
       const result = parseTournament(text, "toppadel");
+      expect(result).toMatchSnapshot();
+    });
+
+    it("parses a real life tournament", () => {
+      const text =
+        "PADEL HOMME 0,00 € / P LISTE ATTENTE TOURNOIS LISTE D ATTENTE P 250 H FLORIAN CANO  Sam. 17 Janv.  19h30 - 23h30  6 place(s) restante(s)  Je m'inscris";
+      const result = parseTournament(text, "testclub");
       expect(result).toMatchSnapshot();
     });
   });

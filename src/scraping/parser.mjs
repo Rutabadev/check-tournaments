@@ -25,19 +25,17 @@ import { DAY_ABBREV_MAP } from "../config/index.mjs";
 export function parseTournament(innerText, subdomain) {
   const text = innerText.replace(/\n/g, " ").trim();
 
-  const levelMatch = text.match(/\b(P\d+)\b/i);
-  const level = levelMatch ? levelMatch[1].toUpperCase() : null;
+  const levelMatch = text.match(/\b(P\s?\d+)\b/i);
+  const level = levelMatch
+    ? levelMatch[1].toUpperCase().replaceAll(" ", "")
+    : null;
 
-  const dateMatch = text.match(
-    /([a-zé]{3}\.)\s+(\d{1,2})\s+([a-zé]{3,4}\.)/i
-  );
+  const dateMatch = text.match(/([a-zé]{3}\.)\s+(\d{1,2})\s+([a-zé]{3,4}\.)/i);
   const dayAbbrev = dateMatch?.[1]?.toLowerCase() || "";
   const dayNum = dateMatch?.[2] || "";
   const month = dateMatch?.[3] || "";
 
-  const timeMatch = text.match(
-    /(\d{2})h(\d{2})(?:\s*-\s*(\d{2})h(\d{2}))?/
-  );
+  const timeMatch = text.match(/(\d{2})h(\d{2})(?:\s*-\s*(\d{2})h(\d{2}))?/);
   const startHour = timeMatch ? parseInt(timeMatch[1]) : null;
   const time = timeMatch
     ? timeMatch[3]
@@ -45,25 +43,28 @@ export function parseTournament(innerText, subdomain) {
       : `${timeMatch[1]}h${timeMatch[2]}`
     : "";
 
-  const spotsMatch = text.match(/(\d+)\s*places?\s*restantes?/i);
+  const spotsMatch = text.match(/(\d+)\s*place\(?s?\)?\s*restante\(?s?\)?/i);
   const spots = spotsMatch ? parseInt(spotsMatch[1]) : 0;
 
   const textLower = text.toLowerCase();
   const category = textLower.includes("femme")
     ? "femme"
     : textLower.includes("mixte")
-      ? "mixte"
-      : "homme";
+    ? "mixte"
+    : "homme";
 
   const ageMatch = text.match(/\+\s*(\d+)/);
   const ageGroup = ageMatch ? `+${ageMatch[1]}` : null;
 
-  const isWaitlist = textLower.includes("liste d'attente");
-
-  const id = `${subdomain}-${dayAbbrev}${dayNum}${month}-${level}-${time}`.replace(
-    /\s+/g,
-    ""
+  const isWaitlist = ["liste", "attente"].every((word) =>
+    textLower.includes(word)
   );
+
+  const id =
+    `${subdomain}-${dayAbbrev}${dayNum}${month}-${level}-${time}`.replace(
+      /\s+/g,
+      ""
+    );
 
   return {
     subdomain,
@@ -73,8 +74,7 @@ export function parseTournament(innerText, subdomain) {
     time,
     spots,
     isNocturne:
-      (startHour !== null && startHour >= 18) ||
-      textLower.includes("nocturne"),
+      (startHour !== null && startHour >= 18) || textLower.includes("nocturne"),
     isFull: spots === 0,
     category,
     ageGroup,
