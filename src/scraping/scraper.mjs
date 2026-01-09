@@ -20,11 +20,11 @@ export async function scrapeTournaments(browser, subdomain) {
     await page.waitForSelector(
       "app-evenements .w-100.contain app-input-search"
     );
-    const tournoisDivs = await page.$$(
+    const tournamentsDivs = await page.$$(
       "app-evenements .w-100.contain app-input-search ~ div.mb-20"
     );
 
-    if (tournoisDivs.length === 0) {
+    if (tournamentsDivs.length === 0) {
       console.log(`[${subdomain}] No tournament divs found`);
       await sendAdminNotification(
         `[Check Tournaments] No tournaments found on ${subdomain}`,
@@ -33,12 +33,19 @@ export async function scrapeTournaments(browser, subdomain) {
     }
 
     const tournaments = await Promise.all(
-      tournoisDivs.map(async (tournoiDiv) => {
+      tournamentsDivs.map(async (tournamentDiv) => {
         try {
-          const innerText = await tournoiDiv.evaluate(
-            (node) => /** @type {HTMLElement} */ (node).innerText
-          );
-          return parseTournament(innerText, subdomain);
+          const elementData = await tournamentDiv.evaluate((el) => {
+            if (!el) return null;
+            return {
+              innerText: el.innerText || "",
+              spots:
+                el.querySelector("div.fd-column.ai-end > p")?.innerText || null,
+              hasButton: el.querySelector("div.fl.jc-center .button") !== null,
+            };
+          });
+          if (!elementData) return null;
+          return parseTournament(elementData, subdomain);
         } catch (error) {
           console.error(`[${subdomain}] Error parsing tournament:`, error);
           return null;

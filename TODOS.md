@@ -1,4 +1,2 @@
 - Make age match filter match tournament for teens too
 - Add soirée/soiree for isNocturne
-- fix filter for level (-5 return 5, place restantes sometime with parentheses, look for "je m'inscrits")
-- pass HTML element to parseTournament to allow checking in tags

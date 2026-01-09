@@ -17,13 +17,20 @@ import { DAY_ABBREV_MAP } from "../config/index.mjs";
  */
 
 /**
- * Parse tournament HTML element into structured data
- * @param {string} innerText - Raw text from tournament div
+ * @typedef {Object} TournamentElementData
+ * @property {string} innerText - The full innerText of the element
+ * @property {string|null} spots - Text from the spots element (e.g., "4 places restantes")
+ * @property {boolean} hasButton - Whether the signup button is present
+ */
+
+/**
+ * Parse tournament element data into structured data
+ * @param {TournamentElementData} elementData - Data extracted from the tournament element
  * @param {string} subdomain
  * @returns {Tournament}
  */
-export function parseTournament(innerText, subdomain) {
-  const text = innerText.replace(/\n/g, " ").trim();
+export function parseTournament(elementData, subdomain) {
+  const text = elementData.innerText.replace(/\n/g, " ").trim();
 
   const levelMatch = text.match(/\b(P\s?\d+)\b/i);
   const level = levelMatch
@@ -43,8 +50,9 @@ export function parseTournament(innerText, subdomain) {
       : `${timeMatch[1]}h${timeMatch[2]}`
     : "";
 
-  const spotsMatch = text.match(/(\d+)\s*place\(?s?\)?\s*restante\(?s?\)?/i);
-  const spots = spotsMatch ? parseInt(spotsMatch[1]) : 0;
+  const spotsMatch = elementData.spots?.match(/(\d+)/);
+  const spots =
+    elementData.hasButton && spotsMatch ? parseInt(spotsMatch[1]) : 0;
 
   const textLower = text.toLowerCase();
   const category = textLower.includes("femme")
