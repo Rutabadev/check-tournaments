@@ -24,12 +24,16 @@ export function createDynamoClient() {
 }
 
 /**
- * Get tournament IDs from DB for a subdomain
+ * @typedef {import("../scraping/parser.mjs").Tournament} Tournament
+ */
+
+/**
+ * Get tournaments from DB for a subdomain
  * @param {DynamoDBClient} client
  * @param {string} subdomain
- * @returns {Promise<string[]>}
+ * @returns {Promise<Tournament[]>}
  */
-export async function getTournamentIds(client, subdomain) {
+export async function getTournaments(client, subdomain) {
   try {
     const { Items } = await client.send(
       new QueryCommand({
@@ -51,18 +55,18 @@ export async function getTournamentIds(client, subdomain) {
 }
 
 /**
- * Save tournament IDs to DB for a subdomain
+ * Save tournaments to DB for a subdomain
  * @param {DynamoDBClient} client
  * @param {string} subdomain
- * @param {string[]} tournamentIds
+ * @param {Tournament[]} tournaments
  */
-export async function putTournamentIds(client, subdomain, tournamentIds) {
+export async function putTournaments(client, subdomain, tournaments) {
   await client.send(
     new PutItemCommand({
       TableName: TABLE_NAME,
       Item: {
         id: { S: `latest-${subdomain}` },
-        tournaments: { S: JSON.stringify(tournamentIds) },
+        tournaments: { S: JSON.stringify(tournaments) },
       },
     })
   );
@@ -72,7 +76,7 @@ export async function putTournamentIds(client, subdomain, tournamentIds) {
 /**
  * Update database for all subdomains with changes
  * @param {DynamoDBClient} client
- * @param {{subdomain: string, tournamentIds: string[]}[]} updates
+ * @param {{subdomain: string, tournaments: Tournament[]}[]} updates
  */
 export async function updateDatabase(client, updates) {
   const config = getConfig();
@@ -88,6 +92,6 @@ export async function updateDatabase(client, updates) {
 
   console.log(`Updating DB for ${updates.length} subdomain(s)`);
   for (const update of updates) {
-    await putTournamentIds(client, update.subdomain, update.tournamentIds);
+    await putTournaments(client, update.subdomain, update.tournaments);
   }
 }

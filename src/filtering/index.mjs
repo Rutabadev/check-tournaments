@@ -5,20 +5,6 @@ import { defaultFilters } from "./rules.mjs";
  */
 
 /**
- * Get the storage ID for a tournament (base ID + suffixes for state tracking)
- * @param {Tournament} tournament
- * @param {{ asFull?: boolean }} [options] - Override isFull state
- * @returns {string}
- */
-function getStorageId(tournament, options = {}) {
-  let id = tournament.id;
-  if (tournament.isWaitlist) id += "_waitlist";
-  const isFull = options.asFull ?? tournament.isFull;
-  if (isFull) id += "_full";
-  return id;
-}
-
-/**
  * Apply default filters to tournaments
  * @param {Tournament[]} tournaments
  * @returns {Tournament[]}
@@ -28,37 +14,33 @@ export function applyFilters(tournaments) {
 }
 
 /**
- * Find new tournaments by comparing current with previous IDs
- * Also detects freed spots (previously full, now available)
+ * Find new tournaments by comparing current with previous
  * @param {Tournament[]} currentTournaments
- * @param {string[]} previousIds
+ * @param {Tournament[]} previousTournaments
  * @returns {{tournament: Tournament, isFreedSpot: boolean}[]}
  */
-export function findNewTournaments(currentTournaments, previousIds) {
-  const previousIdSet = new Set(previousIds);
+export function findNewTournaments(currentTournaments, previousTournaments) {
+  const previousById = new Map(previousTournaments.map((t) => [t.id, t]));
 
   const filtered = applyFilters(currentTournaments);
 
   return filtered
     .filter((t) => {
-      const storageId = getStorageId(t);
-      const wasKnown = previousIdSet.has(storageId);
-      const wasFullId = getStorageId(t, { asFull: true });
-      const wasFullBefore = previousIdSet.has(wasFullId);
-      return !wasKnown || wasFullBefore;
+      if (
+        t.rawText ===
+        "PADEL OPEN 25,00 € / P TOURNOIS HOMOLOGUES P250 Hommes matin  Ven. 16 Janv.  07h30 - 12h00  1 place(s) restante(s)  Je m'inscris"
+      ) {
+        console.log("-----current------");
+        console.log(t);
+        console.log("-----previous------");
+        console.log(previousById.get(t.id));
+      }
+      const previous = previousById.get(t.id);
+      return !previous || (previous.isFull && !t.isFull);
     })
     .map((tournament) => {
-      const wasFullId = getStorageId(tournament, { asFull: true });
-      const isFreedSpot = previousIdSet.has(wasFullId);
+      const previous = previousById.get(tournament.id);
+      const isFreedSpot = Boolean(previous?.isFull && !tournament.isFull);
       return { tournament, isFreedSpot };
     });
-}
-
-/**
- * Get IDs for DB storage (includes suffixes for state tracking)
- * @param {Tournament[]} tournaments
- * @returns {string[]}
- */
-export function getTournamentIdsForStorage(tournaments) {
-  return tournaments.map((t) => getStorageId(t));
 }

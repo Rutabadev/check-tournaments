@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  applyFilters,
-  findNewTournaments,
-  getTournamentIdsForStorage,
-} from "./index.mjs";
+import { applyFilters, findNewTournaments } from "./index.mjs";
 
 const validTournament = {
   subdomain: "test",
@@ -68,7 +64,7 @@ describe("applyFilters", () => {
 });
 
 describe("findNewTournaments", () => {
-  it("returns new tournaments not in previous IDs", () => {
+  it("returns new tournaments not in previous list", () => {
     const result = findNewTournaments([validTournament], []);
     expect(result).toEqual([
       { tournament: validTournament, isFreedSpot: false },
@@ -76,18 +72,20 @@ describe("findNewTournaments", () => {
   });
 
   it("excludes tournaments already known", () => {
-    const result = findNewTournaments([validTournament], ["test-id-1"]);
+    const previous = [validTournament];
+    const result = findNewTournaments([validTournament], previous);
     expect(result).toEqual([]);
   });
 
   it("detects freed spots (was full, now available)", () => {
-    const result = findNewTournaments([validTournament], ["test-id-1_full"]);
+    const previousFull = { ...validTournament, isFull: true };
+    const result = findNewTournaments([validTournament], [previousFull]);
     expect(result).toEqual([
       { tournament: validTournament, isFreedSpot: true },
     ]);
   });
 
-  it("still applies filters before checking IDs", () => {
+  it("still applies filters before checking", () => {
     const full = { ...validTournament, isFull: true };
     const result = findNewTournaments([full], []);
     expect(result).toEqual([]);
@@ -98,9 +96,10 @@ describe("findNewTournaments", () => {
     const new2 = { ...validTournament, id: "new-2" };
     const known = { ...validTournament, id: "known" };
     const freed = { ...validTournament, id: "freed" };
+    const previousFreedFull = { ...validTournament, id: "freed", isFull: true };
 
-    const previousIds = ["known", "freed_full"];
-    const result = findNewTournaments([new1, new2, known, freed], previousIds);
+    const previous = [known, previousFreedFull];
+    const result = findNewTournaments([new1, new2, known, freed], previous);
 
     expect(result).toHaveLength(3);
     expect(result.find((r) => r.tournament.id === "new-1")?.isFreedSpot).toBe(
@@ -112,47 +111,5 @@ describe("findNewTournaments", () => {
     expect(result.find((r) => r.tournament.id === "freed")?.isFreedSpot).toBe(
       true
     );
-  });
-});
-
-describe("getTournamentIdsForStorage", () => {
-  it("returns IDs without suffix for available tournaments", () => {
-    expect(getTournamentIdsForStorage([validTournament])).toEqual([
-      "test-id-1",
-    ]);
-  });
-
-  it("adds _full suffix for full tournaments", () => {
-    const full = { ...validTournament, isFull: true };
-    expect(getTournamentIdsForStorage([full])).toEqual(["test-id-1_full"]);
-  });
-
-  it("adds _waitlist suffix for waitlist tournaments", () => {
-    const waitlist = { ...validTournament, isWaitlist: true };
-    expect(getTournamentIdsForStorage([waitlist])).toEqual([
-      "test-id-1_waitlist",
-    ]);
-  });
-
-  it("adds both _waitlist and _full suffixes when applicable", () => {
-    const waitlistFull = { ...validTournament, isWaitlist: true, isFull: true };
-    expect(getTournamentIdsForStorage([waitlistFull])).toEqual([
-      "test-id-1_waitlist_full",
-    ]);
-  });
-
-  it("handles mixed tournaments", () => {
-    const available = { ...validTournament, id: "available-tournament" };
-    const full = { ...validTournament, id: "full-tournament", isFull: true };
-    const waitlist = {
-      ...validTournament,
-      id: "waitlist-tournament",
-      isWaitlist: true,
-    };
-    expect(getTournamentIdsForStorage([available, full, waitlist])).toEqual([
-      "available-tournament",
-      "full-tournament_full",
-      "waitlist-tournament_waitlist",
-    ]);
   });
 });

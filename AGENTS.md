@@ -12,9 +12,10 @@ Handler launches browser
 processSubdomain runs in parallel for each subdomain
   ├─ Login to gestion-sports.com (login.mjs)
   ├─ Scrape & parse tournaments into structured data (scraper.mjs, parser.mjs)
-  ├─ Fetch previous IDs from DynamoDB (dynamodb.mjs)
-  ├─ Filter & find new tournaments (filtering/index.mjs)
-  └─ Return {subdomain, newTournaments, tournamentIds, needsDbUpdate}
+  ├─ Filter out waitlist entries (not stored)
+  ├─ Fetch previous tournaments from DynamoDB (dynamodb.mjs)
+  ├─ Find new tournaments by comparing objects (filtering/index.mjs)
+  └─ Return {subdomain, newTournaments, tournaments, needsDbUpdate}
   ↓
 Collect results (failed subdomains skipped)
   ↓
@@ -116,11 +117,11 @@ To modify filters, edit `defaultFilters` array in `rules.mjs`.
 
 ### State Tracking
 
-DynamoDB stores tournament IDs per subdomain:
+DynamoDB stores full Tournament objects per subdomain (waitlist entries excluded):
 - **Key**: `id: "latest-{subdomain}"`
-- **Value**: JSON array of tournament IDs
+- **Value**: JSON array of Tournament objects
 
-Full tournaments are stored with `_full` suffix to detect freed spots.
+Freed spots are detected by comparing `isFull` state between runs.
 
 ### Single DB Update Path
 
