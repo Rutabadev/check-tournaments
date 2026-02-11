@@ -19,8 +19,8 @@ export async function handler() {
 
     const processResults = await Promise.allSettled(
       SUBDOMAINS.map((subdomain) =>
-        processSubdomain(browser, subdomain, dynamoDbClient)
-      )
+        processSubdomain(browser, subdomain, dynamoDbClient),
+      ),
     );
 
     const newTournamentsBySubdomain = new Map();
@@ -58,7 +58,7 @@ export async function handler() {
     return {
       statusCode: 200,
       body: JSON.stringify(
-        totalNew > 0 ? "Done checking new tournois" : "No new tournaments"
+        totalNew > 0 ? "Done checking new tournois" : "No new tournaments",
       ),
     };
   } catch (error) {
@@ -91,7 +91,7 @@ async function processSubdomain(browser, subdomain, dynamoDbClient) {
     JSON.stringify(tournaments) !== JSON.stringify(previousTournaments);
 
   console.log(
-    `[${subdomain}] ${newTournaments.length} new tournaments, DB update: ${needsDbUpdate}`
+    `[${subdomain}] ${newTournaments.length} new tournaments, DB update: ${needsDbUpdate}`,
   );
 
   return {

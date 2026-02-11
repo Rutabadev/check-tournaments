@@ -42,13 +42,13 @@ export async function getTournaments(client, subdomain) {
         ExpressionAttributeValues: {
           ":id": { S: `latest-${subdomain}` },
         },
-      })
+      }),
     );
     return JSON.parse(Items?.[0]?.tournaments?.S || "[]");
   } catch (error) {
     console.log(
       `[${subdomain}] No previous tournaments in DB (first run or error):`,
-      error.message
+      error.message,
     );
     return [];
   }
@@ -68,7 +68,7 @@ export async function putTournaments(client, subdomain, tournaments) {
         id: { S: `latest-${subdomain}` },
         tournaments: { S: JSON.stringify(tournaments) },
       },
-    })
+    }),
   );
   console.log(`[${subdomain}] DB updated`);
 }

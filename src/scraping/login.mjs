@@ -18,7 +18,7 @@ export async function login(page, subdomain) {
     await page.$$eval("button", (buttons) => {
       buttons
         .filter((button) =>
-          button.innerText.toLowerCase().includes("connecter")
+          button.innerText.toLowerCase().includes("connecter"),
         )[0]
         .click();
     });
@@ -31,7 +31,7 @@ export async function login(page, subdomain) {
     console.error(`[${subdomain}] Login failed:`, error);
     await sendAdminNotification(
       `[Check Tournaments] Login failed on ${subdomain}`,
-      `<p>Login failed for <strong>${subdomain}</strong>.</p><p>Error: ${error.message}</p>`
+      `<p>Login failed for <strong>${subdomain}</strong>.</p><p>Error: ${error.message}</p>`,
     );
     throw new Error(`Login failed for ${subdomain}`);
   }
@@ -46,18 +46,18 @@ async function closeWelcomePopup(page, subdomain) {
     console.log(`[${subdomain}] Close welcome popup`);
     const closePopupButton = await page.waitForSelector(
       "app-welcome-popup button",
-      { timeout: 2000 }
+      { timeout: 2000 },
     );
     if (closePopupButton) {
       await closePopupButton.click();
     }
   } catch (error) {
     console.log(
-      `[${subdomain}] Welcome popup not found (this is okay, continuing...)`
+      `[${subdomain}] Welcome popup not found (this is okay, continuing...)`,
     );
     await sendAdminNotification(
       `[Check Tournaments] No popup found on ${subdomain}`,
-      `<p>The welcome popup was not found when scraping <strong>${subdomain}</strong>. This may indicate a site change or issue with the scraper.</p>`
+      `<p>The welcome popup was not found when scraping <strong>${subdomain}</strong>. This may indicate a site change or issue with the scraper.</p>`,
     );
   }
 }

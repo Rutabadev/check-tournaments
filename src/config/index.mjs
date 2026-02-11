@@ -29,7 +29,7 @@ export function getConfig() {
 
   if (!MAILING_LIST || !EMAIL || !EMAIL_APP_PASS || !PASSWORD) {
     throw new Error(
-      "Missing env variables, required: MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS"
+      "Missing env variables, required: MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS",
     );
   }
 

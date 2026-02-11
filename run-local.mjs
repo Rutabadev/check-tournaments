@@ -1,6 +1,9 @@
 import "dotenv/config";
 
-if (process.env.RUN_MODE === "test" || process.env.RUN_MODE === "production-test") {
+if (
+  process.env.RUN_MODE === "test" ||
+  process.env.RUN_MODE === "production-test"
+) {
   delete process.env.DEBUG;
   console.log("DEBUG mode disabled for testing");
 } else if (process.env.DEBUG) {

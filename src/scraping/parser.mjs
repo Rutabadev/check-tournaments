@@ -65,8 +65,8 @@ export function parseTournament(elementData, subdomain) {
   const category = textLower.includes("femme")
     ? "femme"
     : textLower.includes("mixte")
-    ? "mixte"
-    : "homme";
+      ? "mixte"
+      : "homme";
 
   const ageMatch = text.match(/\+\s*(\d+)/);
   const ageGroup = ageMatch ? `+${ageMatch[1]}` : null;
@@ -75,12 +75,12 @@ export function parseTournament(elementData, subdomain) {
   const youthGroup = youthMatch ? `U${youthMatch[1]}` : null;
 
   const isWaitlist = ["liste", "attente"].every((word) =>
-    textLower.includes(word)
+    textLower.includes(word),
   );
 
   const id = `${dayAbbrev}${dayNum}${month}-${level}-${time}`.replace(
     /\s+/g,
-    ""
+    "",
   );
 
   return {

@@ -13,9 +13,9 @@ describe("parseTournament", () => {
       const result = parseTournament(
         el(
           "P100 lun. 10 jan. 18h00-20h00 4 places restantes homme",
-          "4 places restantes"
+          "4 places restantes",
         ),
-        "testclub"
+        "testclub",
       );
       expect(result).toMatchSnapshot();
     });
@@ -24,9 +24,9 @@ describe("parseTournament", () => {
       const result = parseTournament(
         el(
           "P250 sam. 15 jan. 14h00-16h00 2 places restantes homme",
-          "2 places restantes"
+          "2 places restantes",
         ),
-        "testclub"
+        "testclub",
       );
       expect(result).toMatchSnapshot();
     });
@@ -34,7 +34,7 @@ describe("parseTournament", () => {
     it("parses a full tournament (no spots)", () => {
       const result = parseTournament(
         el("P100 mar. 12 jan. 20h00-22h00 homme", null, false),
-        "testclub"
+        "testclub",
       );
       expect(result).toMatchSnapshot();
     });
@@ -44,7 +44,7 @@ describe("parseTournament", () => {
     it("extracts P50 level", () => {
       const result = parseTournament(
         el("P50 lun. 10 jan. 18h00 homme"),
-        "test"
+        "test",
       );
       expect(result.level).toBe("P50");
     });
@@ -52,7 +52,7 @@ describe("parseTournament", () => {
     it("extracts P100 level", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00 homme"),
-        "test"
+        "test",
       );
       expect(result.level).toBe("P100");
     });
@@ -60,7 +60,7 @@ describe("parseTournament", () => {
     it("extracts P250 level", () => {
       const result = parseTournament(
         el("P250 lun. 10 jan. 18h00 homme"),
-        "test"
+        "test",
       );
       expect(result.level).toBe("P250");
     });
@@ -73,7 +73,7 @@ describe("parseTournament", () => {
     it("handles level with space", () => {
       const result = parseTournament(
         el("P 100 lun. 10 jan. 18h00 homme"),
-        "test"
+        "test",
       );
       expect(result.level).toBe("P100");
     });
@@ -81,7 +81,7 @@ describe("parseTournament", () => {
     it("normalizes lowercase level to uppercase", () => {
       const result = parseTournament(
         el("p100 lun. 10 jan. 18h00 homme"),
-        "test"
+        "test",
       );
       expect(result.level).toBe("P100");
     });
@@ -91,7 +91,7 @@ describe("parseTournament", () => {
     it("detects homme category", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00 homme"),
-        "test"
+        "test",
       );
       expect(result.category).toBe("homme");
     });
@@ -99,7 +99,7 @@ describe("parseTournament", () => {
     it("detects femme category", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00 femme"),
-        "test"
+        "test",
       );
       expect(result.category).toBe("femme");
     });
@@ -107,7 +107,7 @@ describe("parseTournament", () => {
     it("detects mixte category", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00 mixte"),
-        "test"
+        "test",
       );
       expect(result.category).toBe("mixte");
     });
@@ -122,7 +122,7 @@ describe("parseTournament", () => {
     it("detects nocturne by time >= 18h", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00-20h00"),
-        "test"
+        "test",
       );
       expect(result.isNocturne).toBe(true);
     });
@@ -130,7 +130,7 @@ describe("parseTournament", () => {
     it("detects nocturne by with 'nocture' keyword", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 14h00 nocturne"),
-        "test"
+        "test",
       );
       expect(result.isNocturne).toBe(true);
     });
@@ -138,11 +138,11 @@ describe("parseTournament", () => {
     it("detects nocturne by with 'soirée/soiree' keyword", () => {
       const result1 = parseTournament(
         el("P100 lun. 10 jan. 14h00 soirée"),
-        "test"
+        "test",
       );
       const result2 = parseTournament(
         el("P100 lun. 10 jan. 14h00 soiree"),
-        "test"
+        "test",
       );
       expect(result1.isNocturne).toBe(true);
       expect(result2.isNocturne).toBe(true);
@@ -151,7 +151,7 @@ describe("parseTournament", () => {
     it("not nocturne for daytime", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 14h00-16h00"),
-        "test"
+        "test",
       );
       expect(result.isNocturne).toBe(false);
     });
@@ -171,7 +171,7 @@ describe("parseTournament", () => {
     it("handles + with space before number", () => {
       const result = parseTournament(
         el("P100 + 45 lun. 10 jan. 18h00"),
-        "test"
+        "test",
       );
       expect(result.ageGroup).toBe("+45");
     });
@@ -201,7 +201,7 @@ describe("parseTournament", () => {
     it("handles U with space before number", () => {
       const result = parseTournament(
         el("P100 U 14 lun. 10 jan. 18h00"),
-        "test"
+        "test",
       );
       expect(result.youthGroup).toBe("U14");
     });
@@ -216,7 +216,7 @@ describe("parseTournament", () => {
     it("detects waitlist tournament", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00 liste d'attente"),
-        "test"
+        "test",
       );
       expect(result.isWaitlist).toBe(true);
     });
@@ -231,7 +231,7 @@ describe("parseTournament", () => {
     it("parses single digit spots", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00", "4 places restantes"),
-        "test"
+        "test",
       );
       expect(result.spots).toBe(4);
     });
@@ -239,7 +239,7 @@ describe("parseTournament", () => {
     it("parses double digit spots", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00", "12 places restantes"),
-        "test"
+        "test",
       );
       expect(result.spots).toBe(12);
     });
@@ -247,7 +247,7 @@ describe("parseTournament", () => {
     it("handles singular place", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00", "1 place restante"),
-        "test"
+        "test",
       );
       expect(result.spots).toBe(1);
     });
@@ -255,7 +255,7 @@ describe("parseTournament", () => {
     it("parses spots with parenthesis", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00", "1 place(s) restante(s)"),
-        "test"
+        "test",
       );
       expect(result.spots).toBe(1);
     });
@@ -263,7 +263,7 @@ describe("parseTournament", () => {
     it("returns 0 when no spots mentioned", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00", null),
-        "test"
+        "test",
       );
       expect(result.spots).toBe(0);
       expect(result.isFull).toBe(true);
@@ -272,7 +272,7 @@ describe("parseTournament", () => {
     it("returns 0 when no button present", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00", "4 places restantes", false),
-        "test"
+        "test",
       );
       expect(result.spots).toBe(0);
       expect(result.isFull).toBe(true);
@@ -300,7 +300,7 @@ describe("parseTournament", () => {
     it("generates unique ID with date, level, time (no subdomain)", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00-20h00"),
-        "myclub"
+        "myclub",
       );
       expect(result.id).toBe("lun.10jan.-P100-18h00-20h00");
     });
@@ -308,11 +308,11 @@ describe("parseTournament", () => {
     it("same ID for same tournament across subdomains", () => {
       const result1 = parseTournament(
         el("P100 lun. 10 jan. 18h00-20h00"),
-        "club1"
+        "club1",
       );
       const result2 = parseTournament(
         el("P100 lun. 10 jan. 18h00-20h00"),
-        "club2"
+        "club2",
       );
       expect(result1.id).toBe(result2.id);
     });
@@ -320,7 +320,7 @@ describe("parseTournament", () => {
     it("does not add suffix for waitlist (handled by storage)", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 18h00-20h00 liste d'attente"),
-        "myclub"
+        "myclub",
       );
       expect(result.id).toBe("lun.10jan.-P100-18h00-20h00");
       expect(result.isWaitlist).toBe(true);
@@ -338,9 +338,9 @@ describe("parseTournament", () => {
         homme
         6 places restantes
       `,
-          "6 places restantes"
+          "6 places restantes",
         ),
-        "toulousepadelclub"
+        "toulousepadelclub",
       );
       expect(result).toMatchSnapshot();
     });
@@ -349,9 +349,9 @@ describe("parseTournament", () => {
       const result = parseTournament(
         el(
           "P250 femme +45 ven. 25 jan. 14h00-16h00 2 places restantes",
-          "2 places restantes"
+          "2 places restantes",
         ),
-        "acepadelclub"
+        "acepadelclub",
       );
       expect(result).toMatchSnapshot();
     });
@@ -359,7 +359,7 @@ describe("parseTournament", () => {
     it("parses waitlist tournament", () => {
       const result = parseTournament(
         el("P100 lun. 10 jan. 20h00-22h00 homme liste d'attente", null, false),
-        "toppadel"
+        "toppadel",
       );
       expect(result).toMatchSnapshot();
     });
@@ -368,9 +368,9 @@ describe("parseTournament", () => {
       const result = parseTournament(
         el(
           "PADEL HOMME 0,00 € / P LISTE ATTENTE TOURNOIS LISTE D ATTENTE P 250 H FLORIAN CANO  Sam. 17 Janv.  19h30 - 23h30  6 place(s) restante(s)  Je m'inscris",
-          "6 place(s) restante(s)"
+          "6 place(s) restante(s)",
         ),
-        "testclub"
+        "testclub",
       );
       expect(result).toMatchSnapshot();
     });

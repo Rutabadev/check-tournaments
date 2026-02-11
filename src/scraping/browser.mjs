@@ -19,7 +19,7 @@ export async function initBrowser() {
   console.log(
     "Running in",
     isLocal ? "local" : `lambda${isProduction ? " (production)" : ""}`,
-    "mode"
+    "mode",
   );
 
   return { puppeteer, chromium, isProduction };

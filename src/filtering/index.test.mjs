@@ -103,13 +103,13 @@ describe("findNewTournaments", () => {
 
     expect(result).toHaveLength(3);
     expect(result.find((r) => r.tournament.id === "new-1")?.isFreedSpot).toBe(
-      false
+      false,
     );
     expect(result.find((r) => r.tournament.id === "new-2")?.isFreedSpot).toBe(
-      false
+      false,
     );
     expect(result.find((r) => r.tournament.id === "freed")?.isFreedSpot).toBe(
-      true
+      true,
     );
   });
 });

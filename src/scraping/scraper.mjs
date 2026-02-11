@@ -18,17 +18,17 @@ export async function scrapeTournaments(browser, subdomain) {
     await page.goto(`${baseUrl}/appli/Évènements`);
 
     await page.waitForSelector(
-      "app-evenements .w-100.contain app-input-search"
+      "app-evenements .w-100.contain app-input-search",
     );
     const tournamentsDivs = await page.$$(
-      "app-evenements .w-100.contain app-input-search ~ div.mb-20"
+      "app-evenements .w-100.contain app-input-search ~ div.mb-20",
     );
 
     if (tournamentsDivs.length === 0) {
       console.log(`[${subdomain}] No tournament divs found`);
       await sendAdminNotification(
         `[Check Tournaments] No tournaments found on ${subdomain}`,
-        `<p>No tournament elements found on <strong>${subdomain}</strong>. The selector may have changed.</p>`
+        `<p>No tournament elements found on <strong>${subdomain}</strong>. The selector may have changed.</p>`,
       );
     }
 
@@ -50,7 +50,7 @@ export async function scrapeTournaments(browser, subdomain) {
           console.error(`[${subdomain}] Error parsing tournament:`, error);
           return null;
         }
-      })
+      }),
     ).then((results) => results.filter(Boolean));
 
     console.log(`[${subdomain}] Found ${tournaments.length} tournaments`);

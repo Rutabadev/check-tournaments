@@ -38,7 +38,7 @@ export function formatEmailHtml(tournamentsBySubdomain) {
     const tournamentHtml = tournaments
       .map(
         ({ tournament, isFreedSpot }) =>
-          `<p style="font-size:1rem;line-height:1.5rem">${formatTournament(tournament, { isFreedSpot })}</p>`
+          `<p style="font-size:1rem;line-height:1.5rem">${formatTournament(tournament, { isFreedSpot })}</p>`,
       )
       .join("");
 

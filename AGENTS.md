@@ -32,26 +32,26 @@ Close browser and return
 src/
   config/
     index.mjs           # Env vars, subdomains, constants (SUBDOMAINS, DAY_ABBREV_MAP, etc.)
-  
+
   scraping/
     browser.mjs         # Browser launch (local vs lambda)
     login.mjs           # Login to gestion-sports
     parser.mjs          # Parse tournament HTML into structured Tournament object
     scraper.mjs         # Orchestrates: login → navigate → parse
-  
+
   storage/
     dynamodb.mjs        # Client init, get/put operations
-  
+
   email/
     transport.mjs       # Nodemailer setup
     formatter.mjs       # Tournament → HTML (simple template)
     sender.mjs          # Send tournament notifications
     admin.mjs           # Send admin error notifications
-  
+
   filtering/
     rules.mjs           # Filter functions (isNotFull, isMen, isNotSenior, etc.)
     index.mjs           # Apply filters, find new tournaments, detect freed spots
-  
+
   handler.mjs           # Main Lambda handler (orchestration only)
 
 index.mjs               # Entry point, exports handler
@@ -95,6 +95,7 @@ Tournaments are parsed into structured objects (see `src/scraping/parser.mjs`):
 ### Subdomains Being Monitored
 
 Four padel club subdomains (defined in `src/config/index.mjs`):
+
 - `toulousepadelclub.gestion-sports.com`
 - `toppadel.gestion-sports.com`
 - `acepadelclub.gestion-sports.com`
@@ -118,6 +119,7 @@ To modify filters, edit `defaultFilters` array in `rules.mjs`.
 ### State Tracking
 
 DynamoDB stores full Tournament objects per subdomain (waitlist entries excluded):
+
 - **Key**: `id: "latest-{subdomain}"`
 - **Value**: JSON array of Tournament objects
 
@@ -130,6 +132,7 @@ DB updates happen once at the end of handler, after email is sent. No duplicate 
 ## Error Handling & Notifications
 
 Admin notifications (`src/email/admin.mjs`) are sent for:
+
 1. **Login failures** - credentials or site changes
 2. **Missing welcome popup** - site structure may have changed
 3. **No tournaments found** - CSS selector may need update
@@ -144,6 +147,7 @@ Admin notifications (`src/email/admin.mjs`) are sent for:
 ### Modifying Filters
 
 Edit `src/filtering/rules.mjs`. Example to include mixte:
+
 ```javascript
 export const isMen = (t) => t.category === "homme" || t.category === "mixte";
 ```
@@ -165,6 +169,7 @@ npm start
 Browser opens in visible mode. Set `DEBUG=1` in `.env` to skip DB writes.
 
 For production test (writes to DB):
+
 ```bash
 RUN_MODE=test npm start
 ```

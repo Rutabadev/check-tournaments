@@ -21,7 +21,7 @@ describe("formatTournament", () => {
   it("formats a basic nocturne tournament", () => {
     const result = formatTournament(baseTournament);
     expect(result).toMatchInlineSnapshot(
-      `"<b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places"`
+      `"<b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places"`,
     );
   });
 
@@ -29,7 +29,7 @@ describe("formatTournament", () => {
     const daytime = { ...baseTournament, isNocturne: false };
     const result = formatTournament(daytime);
     expect(result).toMatchInlineSnapshot(
-      `"lundi 10 jan. P100 18h00-20h00 4 places"`
+      `"lundi 10 jan. P100 18h00-20h00 4 places"`,
     );
   });
 
@@ -37,7 +37,7 @@ describe("formatTournament", () => {
     const weekend = { ...baseTournament, dayOfWeek: "samedi" };
     const result = formatTournament(weekend);
     expect(result).toMatchInlineSnapshot(
-      `"<b>nocturne</b> <b>samedi</b> 10 jan. P100 18h00-20h00 4 places"`
+      `"<b>nocturne</b> <b>samedi</b> 10 jan. P100 18h00-20h00 4 places"`,
     );
   });
 
@@ -45,14 +45,14 @@ describe("formatTournament", () => {
     const sunday = { ...baseTournament, dayOfWeek: "dimanche" };
     const result = formatTournament(sunday);
     expect(result).toMatchInlineSnapshot(
-      `"<b>nocturne</b> <b>dimanche</b> 10 jan. P100 18h00-20h00 4 places"`
+      `"<b>nocturne</b> <b>dimanche</b> 10 jan. P100 18h00-20h00 4 places"`,
     );
   });
 
   it("adds freed spot prefix", () => {
     const result = formatTournament(baseTournament, { isFreedSpot: true });
     expect(result).toMatchInlineSnapshot(
-      `"Places libérées: <b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places"`
+      `"Places libérées: <b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places"`,
     );
   });
 
@@ -60,7 +60,7 @@ describe("formatTournament", () => {
     const noLevel = { ...baseTournament, level: null };
     const result = formatTournament(noLevel);
     expect(result).toMatchInlineSnapshot(
-      `"<b>nocturne</b> lundi 10 jan. 18h00-20h00 4 places"`
+      `"<b>nocturne</b> lundi 10 jan. 18h00-20h00 4 places"`,
     );
   });
 
@@ -68,7 +68,7 @@ describe("formatTournament", () => {
     const manySpots = { ...baseTournament, spots: 12 };
     const result = formatTournament(manySpots);
     expect(result).toMatchInlineSnapshot(
-      `"<b>nocturne</b> lundi 10 jan. P100 18h00-20h00 12 places"`
+      `"<b>nocturne</b> lundi 10 jan. P100 18h00-20h00 12 places"`,
     );
   });
 });
@@ -80,7 +80,7 @@ describe("formatEmailHtml", () => {
     ]);
     const result = formatEmailHtml(map);
     expect(result).toMatchInlineSnapshot(
-      `"<h2>testclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p>"`
+      `"<h2>testclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p>"`,
     );
   });
 
@@ -103,7 +103,7 @@ describe("formatEmailHtml", () => {
     ]);
     const result = formatEmailHtml(map);
     expect(result).toMatchInlineSnapshot(
-      `"<h2>testclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p><p style="font-size:1rem;line-height:1.5rem">Places libérées: <b>samedi</b> 10 jan. P100 18h00-20h00 4 places</p>"`
+      `"<h2>testclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p><p style="font-size:1rem;line-height:1.5rem">Places libérées: <b>samedi</b> 10 jan. P100 18h00-20h00 4 places</p>"`,
     );
   });
 
@@ -116,7 +116,7 @@ describe("formatEmailHtml", () => {
     ]);
     const result = formatEmailHtml(map);
     expect(result).toMatchInlineSnapshot(
-      `"<h2>club1</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p><hr /><h2>club2</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p>"`
+      `"<h2>club1</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p><hr /><h2>club2</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> lundi 10 jan. P100 18h00-20h00 4 places</p>"`,
     );
   });
 
@@ -170,7 +170,7 @@ describe("formatEmailHtml", () => {
     ]);
     const result = formatEmailHtml(map);
     expect(result).toMatchInlineSnapshot(
-      `"<h2>toulousepadelclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> mercredi 15 jan. P100 20h00-22h00 2 places</p><p style="font-size:1rem;line-height:1.5rem"><b>samedi</b> 18 jan. P250 14h00-16h00 6 places</p><hr /><h2>toppadel</h2><p style="font-size:1rem;line-height:1.5rem">Places libérées: <b>nocturne</b> lundi 20 jan. P50 19h00-21h00 1 places</p>"`
+      `"<h2>toulousepadelclub</h2><p style="font-size:1rem;line-height:1.5rem"><b>nocturne</b> mercredi 15 jan. P100 20h00-22h00 2 places</p><p style="font-size:1rem;line-height:1.5rem"><b>samedi</b> 18 jan. P250 14h00-16h00 6 places</p><hr /><h2>toppadel</h2><p style="font-size:1rem;line-height:1.5rem">Places libérées: <b>nocturne</b> lundi 20 jan. P50 19h00-21h00 1 places</p>"`,
     );
   });
 });
