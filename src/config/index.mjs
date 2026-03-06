@@ -19,7 +19,7 @@ export const DAY_ABBREV_MAP = {
 
 export const WEEKEND_DAYS = ["samedi", "dimanche"];
 
-export const TARGET_LEVELS = ["P50", "P100", "P250"];
+export const TARGET_LEVELS = ["P100", "P250"];
 
 export const ADMIN_EMAIL = "etienner37@gmail.com";
 export const SENDER_EMAIL = "izi.rutabaga@gmail.com";

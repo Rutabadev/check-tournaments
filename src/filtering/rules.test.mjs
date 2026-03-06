@@ -79,10 +79,6 @@ describe("isNotYouth", () => {
 });
 
 describe("isTargetLevel", () => {
-  it("returns true for P50", () => {
-    expect(isTargetLevel({ ...baseTournament, level: "P50" })).toBe(true);
-  });
-
   it("returns true for P100", () => {
     expect(isTargetLevel({ ...baseTournament, level: "P100" })).toBe(true);
   });
