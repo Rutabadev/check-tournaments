@@ -227,6 +227,29 @@ describe("parseTournament", () => {
     });
   });
 
+  describe("stage detection", () => {
+    it("detects stage event", () => {
+      const result = parseTournament(
+        el("Stage P100 lun. 10 jan. 18h00"),
+        "test",
+      );
+      expect(result.isStage).toBe(true);
+    });
+
+    it("detects stage case-insensitively", () => {
+      const result = parseTournament(
+        el("STAGE P100 lun. 10 jan. 18h00"),
+        "test",
+      );
+      expect(result.isStage).toBe(true);
+    });
+
+    it("not stage by default", () => {
+      const result = parseTournament(el("P100 lun. 10 jan. 18h00"), "test");
+      expect(result.isStage).toBe(false);
+    });
+  });
+
   describe("spots parsing", () => {
     it("parses single digit spots", () => {
       const result = parseTournament(

@@ -22,6 +22,9 @@ export const isTargetLevel = (t) => TARGET_LEVELS.includes(t.level);
 /** @param {Tournament} t */
 export const isNotWaitlist = (t) => !t.isWaitlist;
 
+/** @param {Tournament} t */
+export const isNotStage = (t) => !t.isStage;
+
 export const defaultFilters = [
   isNotFull,
   isMen,
@@ -29,4 +32,5 @@ export const defaultFilters = [
   isNotYouth,
   isTargetLevel,
   isNotWaitlist,
+  isNotStage,
 ];

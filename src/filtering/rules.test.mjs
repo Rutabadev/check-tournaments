@@ -6,6 +6,7 @@ import {
   isNotYouth,
   isTargetLevel,
   isNotWaitlist,
+  isNotStage,
   defaultFilters,
 } from "./rules.mjs";
 
@@ -22,6 +23,7 @@ const baseTournament = {
   ageGroup: null,
   youthGroup: null,
   isWaitlist: false,
+  isStage: false,
   rawText: "test",
   id: "test-id",
 };
@@ -106,15 +108,26 @@ describe("isNotWaitlist", () => {
   });
 });
 
+describe("isNotStage", () => {
+  it("returns true when not a stage", () => {
+    expect(isNotStage({ ...baseTournament, isStage: false })).toBe(true);
+  });
+
+  it("returns false when it is a stage", () => {
+    expect(isNotStage({ ...baseTournament, isStage: true })).toBe(false);
+  });
+});
+
 describe("defaultFilters", () => {
-  it("contains all 6 filter functions", () => {
-    expect(defaultFilters).toHaveLength(6);
+  it("contains all 7 filter functions", () => {
+    expect(defaultFilters).toHaveLength(7);
     expect(defaultFilters).toContain(isNotFull);
     expect(defaultFilters).toContain(isMen);
     expect(defaultFilters).toContain(isNotSenior);
     expect(defaultFilters).toContain(isNotYouth);
     expect(defaultFilters).toContain(isTargetLevel);
     expect(defaultFilters).toContain(isNotWaitlist);
+    expect(defaultFilters).toContain(isNotStage);
   });
 
   it("all pass for a valid tournament", () => {

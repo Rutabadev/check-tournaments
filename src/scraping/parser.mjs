@@ -13,6 +13,8 @@ import { DAY_ABBREV_MAP } from "../config/index.mjs";
  * @property {string} category - "homme", "femme", "mixte"
  * @property {string|null} ageGroup - "+45" or null
  * @property {string|null} youthGroup - "U14", "U16", etc. or null
+ * @property {boolean} isWaitlist
+ * @property {boolean} isStage
  * @property {string} rawText - Original text for debugging
  * @property {string} id - Unique ID for DB comparison
  */
@@ -78,6 +80,8 @@ export function parseTournament(elementData, subdomain) {
     textLower.includes(word),
   );
 
+  const isStage = textLower.includes("stage");
+
   const id = `${dayAbbrev}${dayNum}${month}-${level}-${time}`.replace(
     /\s+/g,
     "",
@@ -96,6 +100,7 @@ export function parseTournament(elementData, subdomain) {
     ageGroup,
     youthGroup,
     isWaitlist,
+    isStage,
     rawText: text,
     id,
   };
