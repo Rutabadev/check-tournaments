@@ -8,7 +8,10 @@
     "start": "NODE_ENV=local node run-local.mjs",
     "build": "node esbuild.config.mjs",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "docker:build": "npm run build && docker build -t check-tournaments .",
+    "docker:start": "docker run --rm -p 9000:8080 --name ct-local check-tournaments",
+    "docker:invoke": "curl -s -XPOST \"http://localhost:9000/2015-03-31/functions/function/invocations\" -d \"{}\""
   },
   "keywords": [],
   "author": "",
