@@ -41,7 +41,7 @@ export function getConfig() {
     awsRegion: process.env.AWS_REGION,
     accessKeyId: process.env.ACCESS_KEY_ID,
     secretAccessKey: process.env.SECRET_ACCESS_KEY,
-    debug: !!process.env.DEBUG,
+    debug: !!Number(process.env.DEBUG),
   };
 }
 
