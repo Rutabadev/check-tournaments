@@ -302,6 +302,35 @@ describe("parseTournament", () => {
     });
   });
 
+  describe("date/month parsing", () => {
+    it("parses July date", () => {
+      const result = parseTournament(
+        el("P100 Sam. 4 Juil. 17h30-23h59", "6 place(s) restante(s)"),
+        "toppadel",
+      );
+      expect(result.dayOfWeek).toBe("samedi");
+      expect(result.date).toBe("4 Juil.");
+    });
+
+    it("parses August date with accented month (Août)", () => {
+      const result = parseTournament(
+        el("P100 Lun. 3 Août 07h30-12h00", "4 place(s) restante(s)"),
+        "toppadel",
+      );
+      expect(result.dayOfWeek).toBe("lundi");
+      expect(result.date).toBe("3 Août");
+    });
+
+    it("parses accented abbreviated month (Déc.)", () => {
+      const result = parseTournament(
+        el("P250 Ven. 12 Déc. 18h00-20h00", "2 place(s) restante(s)"),
+        "toppadel",
+      );
+      expect(result.dayOfWeek).toBe("vendredi");
+      expect(result.date).toBe("12 Déc.");
+    });
+  });
+
   describe("day mapping", () => {
     it("maps lun. to lundi", () => {
       const result = parseTournament(el("P100 lun. 10 jan. 18h00"), "test");

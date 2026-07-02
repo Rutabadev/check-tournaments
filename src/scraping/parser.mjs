@@ -40,7 +40,7 @@ export function parseTournament(elementData, subdomain) {
     ? levelMatch[1].toUpperCase().replaceAll(" ", "")
     : null;
 
-  const dateMatch = text.match(/([a-zé]{3}\.)\s+(\d{1,2})\s+([a-zé]{3,5}\.?)/i);
+  const dateMatch = text.match(/(\p{L}{3}\.)\s+(\d{1,2})\s+(\p{L}{3,5}\.?)/u);
   const dayAbbrev = dateMatch?.[1]?.toLowerCase() || "";
   const dayNum = dateMatch?.[2] || "";
   const month = dateMatch?.[3] || "";
