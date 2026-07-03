@@ -1,5 +1,5 @@
-import nodemailer from "nodemailer";
-import { SENDER_EMAIL, ADMIN_EMAIL, getConfig } from "../config/index.mjs";
+import { ADMIN_EMAIL } from "../config/index.mjs";
+import { sendEmail } from "./transport.mjs";
 
 /**
  * Send admin notification email
@@ -8,22 +8,7 @@ import { SENDER_EMAIL, ADMIN_EMAIL, getConfig } from "../config/index.mjs";
  */
 export async function sendAdminNotification(subject, html) {
   try {
-    const config = getConfig();
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: SENDER_EMAIL,
-        pass: config.emailAppPass,
-      },
-    });
-
-    await transporter.sendMail({
-      from: SENDER_EMAIL,
-      to: ADMIN_EMAIL,
-      subject,
-      html,
-    });
-    console.log(`Admin notification sent: ${subject}`);
+    await sendEmail({ to: ADMIN_EMAIL, subject, html });
   } catch (error) {
     console.error("Failed to send admin notification:", error);
   }

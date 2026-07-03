@@ -1,6 +1,6 @@
-import { getTransporter } from "./transport.mjs";
+import { sendEmail } from "./transport.mjs";
 import { formatEmailHtml } from "./formatter.mjs";
-import { SENDER_EMAIL, getConfig } from "../config/index.mjs";
+import { getConfig } from "../config/index.mjs";
 
 /**
  * Send tournament notification email
@@ -8,18 +8,13 @@ import { SENDER_EMAIL, getConfig } from "../config/index.mjs";
  */
 export async function sendTournamentEmail(tournamentsBySubdomain) {
   const config = getConfig();
-  const transporter = getTransporter();
 
   const allTournaments = [...tournamentsBySubdomain.values()].flat();
   const onlyFreedSpots = allTournaments.every((t) => t.isFreedSpot);
 
-  const mailOptions = {
-    from: SENDER_EMAIL,
+  await sendEmail({
     to: config.mailingList.join(", "),
     subject: onlyFreedSpots ? "Places libérées" : "Nouveaux tournois",
     html: formatEmailHtml(tournamentsBySubdomain),
-  };
-
-  const sentMessageInfo = await transporter.sendMail(mailOptions);
-  console.log("Email sent:", sentMessageInfo);
+  });
 }
