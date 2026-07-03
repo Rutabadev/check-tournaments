@@ -1,39 +1,20 @@
-import { isLocal } from "../config/index.mjs";
-
-let puppeteer, chromium;
-let isProduction = false;
-
-export async function initBrowser() {
-  if (isLocal) {
-    puppeteer = (await import("puppeteer")).default;
-  } else {
-    try {
-      await import("dotenv/config");
-    } catch {
-      isProduction = true;
-    }
-    puppeteer = (await import("puppeteer-core")).default;
-    chromium = (await import("@sparticuz/chromium")).default;
-  }
-
-  console.log(
-    "Running in",
-    isLocal ? "local" : `lambda${isProduction ? " (production)" : ""}`,
-    "mode",
-  );
-
-  return { puppeteer, chromium, isProduction };
-}
+import { mode } from "../config/index.mjs";
 
 export async function launchBrowser() {
-  const { puppeteer, chromium } = await initBrowser();
+  const useLocalChrome = mode === "local";
 
-  if (isLocal) {
+  console.log(`Running in ${mode} mode`);
+
+  if (useLocalChrome) {
+    const puppeteer = (await import("puppeteer")).default;
     return puppeteer.launch({
       headless: false,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
   }
+
+  const puppeteer = (await import("puppeteer-core")).default;
+  const chromium = (await import("@sparticuz/chromium")).default;
 
   return puppeteer.launch({
     args: [
@@ -48,8 +29,4 @@ export async function launchBrowser() {
     headless: chromium.headless,
     ignoreHTTPSErrors: true,
   });
-}
-
-export function getIsProduction() {
-  return isProduction;
 }

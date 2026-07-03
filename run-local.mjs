@@ -1,14 +1,6 @@
-import "dotenv/config";
-
-if (
-  process.env.RUN_MODE === "test" ||
-  process.env.RUN_MODE === "production-test"
-) {
-  delete process.env.DEBUG;
-  console.log("DEBUG mode disabled for testing");
-} else if (process.env.DEBUG) {
-  console.log("DEBUG mode enabled (set in .env or environment)");
-}
+// Importing config first loads .env (config owns dotenv when RUN_MODE=local),
+// so CHROME_PATH is available below.
+import "./src/config/index.mjs";
 
 process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true";
 process.env.PUPPETEER_EXECUTABLE_PATH = process.env.CHROME_PATH;

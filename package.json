@@ -5,7 +5,7 @@
   "main": "index.mjs",
   "type": "module",
   "scripts": {
-    "start": "NODE_ENV=local node run-local.mjs",
+    "start": "RUN_MODE=local node run-local.mjs",
     "build": "node esbuild.config.mjs",
     "test": "vitest",
     "test:run": "vitest run",

@@ -3,23 +3,16 @@ import {
   PutItemCommand,
   QueryCommand,
 } from "@aws-sdk/client-dynamodb";
-import { isLocal, getConfig } from "../config/index.mjs";
-import { getIsProduction } from "../scraping/browser.mjs";
+import { getConfig } from "../config/index.mjs";
 
 const TABLE_NAME = "tournaments";
 
 export function createDynamoClient() {
-  const config = getConfig();
-  const isProduction = getIsProduction();
+  const { awsRegion, credentials } = getConfig();
 
   return new DynamoDBClient({
-    region: config.awsRegion,
-    ...((isLocal || !isProduction) && {
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-    }),
+    region: awsRegion,
+    ...(credentials && { credentials }),
   });
 }
 

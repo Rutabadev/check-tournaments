@@ -177,16 +177,34 @@ RUN_MODE=test npm start
 ## Environment Variables Required
 
 ```
+RUN_MODE           - "local" | "docker" | unset (defaults to "production")
 EMAIL              - Login email for padel websites
 PASSWORD           - Login password
 MAILING_LIST       - Comma-separated emails to notify
 EMAIL_APP_PASS     - Gmail app-specific password
 AWS_REGION         - DynamoDB region
-ACCESS_KEY_ID      - AWS credentials (local only)
-SECRET_ACCESS_KEY  - AWS credentials (local only)
-NODE_ENV           - "local" or unset for Lambda
+ACCESS_KEY_ID      - AWS credentials (local/docker only)
+SECRET_ACCESS_KEY  - AWS credentials (local/docker only)
 DEBUG              - If set, skips DB writes
 ```
+
+### Run Modes
+
+`RUN_MODE` is the single source of truth for the environment. It is resolved in
+`src/config/index.mjs` and set by the launcher, never read from `.env`:
+
+- **production** (`RUN_MODE` unset) — Lambda with chromium as a layer. Uses the
+  IAM role for AWS (no explicit credentials). Config comes from Lambda env vars;
+  dotenv is never loaded.
+- **docker** (`RUN_MODE=docker`, set in the Dockerfile) — Lambda container image
+  with bundled `@sparticuz/chromium`. Loads `.env`, uses explicit AWS
+  credentials.
+- **local** (`RUN_MODE=local`, set by `npm start`) — uses your machine's Chrome
+  (full puppeteer, visible). Loads `.env`, uses explicit AWS credentials.
+
+`mode` drives only the browser choice (`browser.mjs`) and AWS credentials
+(`getConfig().credentials`). `DEBUG` (skip DB writes) and `MAILING_LIST`
+(recipients) stay independent env vars.
 
 ## Code Style
 
