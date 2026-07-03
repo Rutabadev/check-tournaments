@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { applyFilters, findNewTournaments } from "./index.mjs";
+import {
+  applyFilters,
+  findNewTournaments,
+  analyzeTournaments,
+} from "./index.mjs";
 
 const validTournament = {
   subdomain: "test",
@@ -111,5 +115,65 @@ describe("findNewTournaments", () => {
     expect(result.find((r) => r.tournament.id === "freed")?.isFreedSpot).toBe(
       true,
     );
+  });
+});
+
+describe("analyzeTournaments", () => {
+  it("excludes waitlist entries from the persisted set", () => {
+    const waitlist = {
+      ...validTournament,
+      id: "waitlist-id",
+      isWaitlist: true,
+    };
+    const { toPersist } = analyzeTournaments([validTournament, waitlist], []);
+    expect(toPersist).toEqual([validTournament]);
+  });
+
+  it("returns new tournaments filtered for notification", () => {
+    const femme = { ...validTournament, id: "femme-id", category: "femme" };
+    const { newTournaments } = analyzeTournaments(
+      [validTournament, femme],
+      [],
+    );
+    expect(newTournaments).toEqual([
+      { tournament: validTournament, isFreedSpot: false },
+    ]);
+  });
+
+  it("flags needsDbUpdate when the stored set changed", () => {
+    const { needsDbUpdate } = analyzeTournaments([validTournament], []);
+    expect(needsDbUpdate).toBe(true);
+  });
+
+  it("does not flag needsDbUpdate when nothing changed", () => {
+    const { needsDbUpdate } = analyzeTournaments(
+      [validTournament],
+      [validTournament],
+    );
+    expect(needsDbUpdate).toBe(false);
+  });
+
+  it("ignores waitlist churn for needsDbUpdate", () => {
+    const waitlist = {
+      ...validTournament,
+      id: "waitlist-id",
+      isWaitlist: true,
+    };
+    const { needsDbUpdate } = analyzeTournaments(
+      [validTournament, waitlist],
+      [validTournament],
+    );
+    expect(needsDbUpdate).toBe(false);
+  });
+
+  it("detects freed spots against the previous set", () => {
+    const previousFull = { ...validTournament, isFull: true };
+    const { newTournaments } = analyzeTournaments(
+      [validTournament],
+      [previousFull],
+    );
+    expect(newTournaments).toEqual([
+      { tournament: validTournament, isFreedSpot: true },
+    ]);
   });
 });

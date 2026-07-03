@@ -6,7 +6,7 @@ import {
   getTournaments,
   updateDatabase,
 } from "./storage/dynamodb.mjs";
-import { findNewTournaments } from "./filtering/index.mjs";
+import { analyzeTournaments } from "./analysis/index.mjs";
 import { sendTournamentEmail } from "./email/sender.mjs";
 
 export async function handler() {
@@ -82,13 +82,12 @@ export async function handler() {
  * @param {import("@aws-sdk/client-dynamodb").DynamoDBClient} dynamoDbClient
  */
 async function processSubdomain(browser, subdomain, dynamoDbClient) {
-  const allTournaments = await scrapeTournaments(browser, subdomain);
-  const tournaments = allTournaments.filter((t) => !t.isWaitlist);
+  const scraped = await scrapeTournaments(browser, subdomain);
   const previousTournaments = await getTournaments(dynamoDbClient, subdomain);
-  const newTournaments = findNewTournaments(tournaments, previousTournaments);
-
-  const needsDbUpdate =
-    JSON.stringify(tournaments) !== JSON.stringify(previousTournaments);
+  const { toPersist, newTournaments, needsDbUpdate } = analyzeTournaments(
+    scraped,
+    previousTournaments,
+  );
 
   console.log(
     `[${subdomain}] ${newTournaments.length} new tournaments, DB update: ${needsDbUpdate}`,
@@ -97,7 +96,7 @@ async function processSubdomain(browser, subdomain, dynamoDbClient) {
   return {
     subdomain,
     newTournaments,
-    tournaments,
+    tournaments: toPersist,
     needsDbUpdate,
   };
 }

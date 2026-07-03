@@ -35,3 +35,26 @@ export function findNewTournaments(currentTournaments, previousTournaments) {
       return { tournament, isFreedSpot };
     });
 }
+
+/**
+ * Analyze a fresh scrape against the previously stored tournaments.
+ *
+ * Produces everything the handler needs: the broad set to persist (waitlist
+ * excluded), the narrow set of new/freed tournaments to notify, and whether
+ * the stored set changed.
+ *
+ * @param {Tournament[]} scraped - Raw tournaments from the scraper
+ * @param {Tournament[]} previous - Previously stored tournaments
+ * @returns {{
+ *   toPersist: Tournament[],
+ *   newTournaments: {tournament: Tournament, isFreedSpot: boolean}[],
+ *   needsDbUpdate: boolean,
+ * }}
+ */
+export function analyzeTournaments(scraped, previous) {
+  const toPersist = scraped.filter((t) => !t.isWaitlist);
+  const newTournaments = findNewTournaments(toPersist, previous);
+  const needsDbUpdate = JSON.stringify(toPersist) !== JSON.stringify(previous);
+
+  return { toPersist, newTournaments, needsDbUpdate };
+}

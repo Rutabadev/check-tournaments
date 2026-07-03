@@ -14,7 +14,7 @@ processSubdomain runs in parallel for each subdomain
   ├─ Scrape & parse tournaments into structured data (scraper.mjs, parser.mjs)
   ├─ Filter out waitlist entries (not stored)
   ├─ Fetch previous tournaments from DynamoDB (dynamodb.mjs)
-  ├─ Find new tournaments by comparing objects (filtering/index.mjs)
+  ├─ Analyze scrape vs stored: persist set, new tournaments, needs-update (analysis/index.mjs)
   └─ Return {subdomain, newTournaments, tournaments, needsDbUpdate}
   ↓
 Collect results (failed subdomains skipped)
@@ -48,9 +48,9 @@ src/
     sender.mjs          # Send tournament notifications
     admin.mjs           # Send admin error notifications
 
-  filtering/
+  analysis/
     rules.mjs           # Filter functions (isNotFull, isMen, isNotSenior, etc.)
-    index.mjs           # Apply filters, find new tournaments, detect freed spots
+    index.mjs           # analyzeTournaments: persist set, new tournaments, needs-update
 
   handler.mjs           # Main Lambda handler (orchestration only)
 
@@ -86,7 +86,7 @@ Tournaments are parsed into structured objects (see `src/scraping/parser.mjs`):
 - **src/handler.mjs** - Main Lambda handler (orchestration only)
 - **src/config/index.mjs** - Environment variables, constants, subdomain list
 - **src/scraping/parser.mjs** - Core parsing logic (HTML text → structured data)
-- **src/filtering/rules.mjs** - Tournament filter functions
+- **src/analysis/rules.mjs** - Tournament filter functions
 - **src/email/formatter.mjs** - Simple email formatting (uses structured fields)
 - **run-local.mjs** - Local test runner
 
@@ -103,7 +103,7 @@ Four padel club subdomains (defined in `src/config/index.mjs`):
 
 ### Tournament Filtering Logic
 
-Filters are defined in `src/filtering/rules.mjs`:
+Filters are defined in `src/analysis/rules.mjs`:
 
 ```javascript
 export const isNotFull = (t) => !t.isFull;
@@ -146,7 +146,7 @@ Admin notifications (`src/email/admin.mjs`) are sent for:
 
 ### Modifying Filters
 
-Edit `src/filtering/rules.mjs`. Example to include mixte:
+Edit `src/analysis/rules.mjs`. Example to include mixte:
 
 ```javascript
 export const isMen = (t) => t.category === "homme" || t.category === "mixte";
