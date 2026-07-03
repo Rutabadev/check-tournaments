@@ -40,7 +40,13 @@ export const TARGET_LEVELS = ["P100", "P250"];
 export const ADMIN_EMAIL = "etienner37@gmail.com";
 export const SENDER_EMAIL = "izi.rutabaga@gmail.com";
 
+let config = null;
+
 export function getConfig() {
+  if (config) {
+    return config;
+  }
+
   const { MAILING_LIST, EMAIL, PASSWORD, EMAIL_APP_PASS } = process.env;
 
   if (!MAILING_LIST || !EMAIL || !EMAIL_APP_PASS || !PASSWORD) {
@@ -49,7 +55,7 @@ export function getConfig() {
     );
   }
 
-  return {
+  config = Object.freeze({
     mailingList: MAILING_LIST.split(","),
     email: EMAIL,
     password: PASSWORD,
@@ -65,7 +71,9 @@ export function getConfig() {
             secretAccessKey: process.env.SECRET_ACCESS_KEY,
           },
     debug: !!Number(process.env.DEBUG),
-  };
+  });
+
+  return config;
 }
 
 export const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
