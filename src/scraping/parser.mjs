@@ -35,9 +35,9 @@ import { DAY_ABBREV_MAP } from "../config/index.mjs";
 export function parseTournament(elementData, subdomain) {
   const text = elementData.innerText.replace(/\n/g, " ").trim();
 
-  const levelMatch = text.match(/\b(P\s?\d+)\b/i);
+  const levelMatch = text.match(/\bP\s?\d+/i);
   const level = levelMatch
-    ? levelMatch[1].toUpperCase().replaceAll(" ", "")
+    ? levelMatch[0].toUpperCase().replaceAll(" ", "")
     : null;
 
   const dateMatch = text.match(/(\p{L}{3}\.)\s+(\d{1,2})\s+(\p{L}{3,5}\.?)/u);

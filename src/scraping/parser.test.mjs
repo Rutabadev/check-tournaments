@@ -78,6 +78,14 @@ describe("parseTournament", () => {
       expect(result.level).toBe("P100");
     });
 
+    it("extracts level when category letter is glued to the number", () => {
+      const result = parseTournament(
+        el("TOURNOIS AOÛT P 250H FLORIAN CANO ven. 7 Août 18h00-23h30 homme"),
+        "test",
+      );
+      expect(result.level).toBe("P250");
+    });
+
     it("normalizes lowercase level to uppercase", () => {
       const result = parseTournament(
         el("p100 lun. 10 jan. 18h00 homme"),
