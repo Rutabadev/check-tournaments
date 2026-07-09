@@ -66,7 +66,7 @@ export function parseTournament(elementData, subdomain) {
 
   const category = textLower.includes("femme")
     ? "femme"
-    : textLower.includes("mixte")
+    : textLower.includes("mixte") || /\bmxt\b/.test(textLower)
       ? "mixte"
       : "homme";
 

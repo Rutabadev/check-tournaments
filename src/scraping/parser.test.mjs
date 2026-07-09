@@ -120,6 +120,14 @@ describe("parseTournament", () => {
       expect(result.category).toBe("mixte");
     });
 
+    it("detects mixte category from MXT abbreviation", () => {
+      const result = parseTournament(
+        el("TOURNOIS AOÛT P 100 MXT FLORIAN CANO ven. 28 Août 18h00-23h30"),
+        "test",
+      );
+      expect(result.category).toBe("mixte");
+    });
+
     it("defaults to homme when no category", () => {
       const result = parseTournament(el("P100 lun. 10 jan. 18h00"), "test");
       expect(result.category).toBe("homme");
